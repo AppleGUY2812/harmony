@@ -1,4 +1,4 @@
-import { usePopupContext } from "../../popupContext/PopupContext";
+import { usePopupContext } from "../PopupContext";
 import { CSSTransition } from "react-transition-group";
 import { useRef } from "react";
 const Tooltip = () => {
