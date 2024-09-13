@@ -4,11 +4,11 @@ import { useRef } from "react";
 const ServerTooltip = () => {
   const tooltipRef = useRef();
   const { serverTooltip } = usePopupContext();
-  const { name, position } = serverTooltip;
+  const { visible, name, position } = serverTooltip;
   return (
     // need to move CSSTransition in here so it can use useContext
     <CSSTransition
-      in={serverTooltip.visible}
+      in={visible}
       nodeRef={tooltipRef}
       timeout={75}
       classNames="server-tooltip"
@@ -18,7 +18,7 @@ const ServerTooltip = () => {
         ref={tooltipRef}
         style={{
           top: `${position.top + position.height / 2}px`,
-          left: `${position.left + 25}px`,
+          left: `${position.right + 22}px`,
         }}
         className="server-tooltip"
       >
