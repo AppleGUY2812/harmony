@@ -6,8 +6,10 @@ import PropTypes from "prop-types";
 import { usePopupContext } from "../PopupContext";
 import useCreateChannel from "../../../hooks/useCreateChannel";
 import useServer from "../../../zustand/useServer";
+import toast from "react-hot-toast";
 const CreateChannelMenu = () => {
   const menuRef = useRef(null);
+  const inputRef = useRef(null);
   const selectedServer = useServer((state) => state.selectedServer);
   const [buttonsDisabled, setButtonsDisabled] = useState(false);
   const { loading, createChannel } = useCreateChannel();
@@ -26,21 +28,32 @@ const CreateChannelMenu = () => {
   }, [setChannelMenuVisible, setModalOverlayVisible]);
 
   useEffect(() => {
+    const handleKeyDown = (event) => {
+      event.stopPropagation();
+      inputRef.current?.focus();
+    };
     const handleClickOutside = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         onClose();
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("click", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("click", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
     };
   }, [onClose]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    await createChannel(selectedServer.server_id, channelName);
-    onClose();
+    console.log(channelName.length);
+    if (channelName.length > 30) {
+      toast.error("Channel name too long");
+    } else {
+      await createChannel(selectedServer.server_id, channelName);
+      onClose();
+    }
   };
 
   return (
@@ -50,7 +63,10 @@ const CreateChannelMenu = () => {
       timeout={200}
       classNames="channel-menu"
       unmountOnExit
-      onEntering={() => setButtonsDisabled(true)}
+      onEntering={() => {
+        setButtonsDisabled(true);
+        setChannelName("");
+      }}
       onEntered={() => setButtonsDisabled(false)}
       onExiting={() => setButtonsDisabled(true)}
     >
@@ -60,7 +76,7 @@ const CreateChannelMenu = () => {
             <div className="w-[460px] rounded-md bg-green-200 p-4">
               <div className="mb-4 flex items-center justify-between">
                 <h1 className="text-xl font-medium">Create Channel</h1>
-                <button onMouseDown={onClose} className="hover:text-green-500">
+                <button onClick={onClose} className="hover:text-green-500">
                   <IoIosClose className="flex-shrink-0" size={40} />
                 </button>
               </div>
@@ -69,11 +85,12 @@ const CreateChannelMenu = () => {
                 <div className="flex h-10 items-center gap-2 rounded-md bg-base-100 pl-2">
                   <TbBrandAmongUs className="flex-shrink-0" size={20} />
                   <input
+                    ref={inputRef}
                     value={channelName}
                     onChange={handleInputChange}
                     type="text"
                     placeholder="new-channel"
-                    className="flex-1 bg-transparent"
+                    className="h-full flex-1 bg-transparent"
                   />
                 </div>
               </div>
@@ -85,7 +102,8 @@ const CreateChannelMenu = () => {
                   Cancel
                 </button>
                 <button
-                  className={`h-9 rounded-md ${channelName ? "bg-cyan-400 text-lime-400" : "cursor-not-allowed bg-red-500 text-yellow-500"} px-4`}
+                  disabled={!channelName || channelName.length > 30}
+                  className={`h-9 rounded-md ${!channelName || channelName.length > 30 ? "cursor-not-allowed bg-red-500 text-yellow-500" : "bg-cyan-400 text-lime-400"} px-4`}
                 >
                   Create Channel
                 </button>
