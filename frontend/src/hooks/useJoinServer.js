@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import toast from "react-hot-toast";
 import useServer from "../zustand/useServer";
 
@@ -6,25 +6,22 @@ import useServer from "../zustand/useServer";
 const useJoinServer = () => {
   const [loading, setLoading] = useState(false);
   const addServer = useServer((state) => state.addServer);
-  const joinServer = useCallback(
-    async (server_id) => {
-      setLoading(true);
-      try {
-        const res = await fetch(`/api/servers/join/${server_id}`, {
-          method: "POST",
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error);
-        addServer(data);
-        return data;
-      } catch (error) {
-        toast.error(error.message);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [addServer],
-  );
+  const joinServer = async (server_id) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/servers/join/${server_id}`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      addServer(data);
+      return data;
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return { loading, joinServer };
 };

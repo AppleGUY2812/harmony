@@ -14,7 +14,7 @@ const CreateServerMenu = () => {
   const setSelectedServer = useServer((state) => state.setSelectedServer);
   const addServer = useServer((state) => state.addServer);
   const [buttonsDisabled, setButtonsDisabled] = useState(false);
-  const { loading, createServer } = useCreateServer();
+  const { createServer } = useCreateServer();
   const { serverMenu, setServerMenuVisible, setModalOverlayVisible } =
     usePopupContext();
 
@@ -35,7 +35,11 @@ const CreateServerMenu = () => {
   }, [setServerMenuVisible, setModalOverlayVisible]);
 
   useEffect(() => {
-    const handleKeyDown = () => {
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+      // apparently focusing on another inputref prevents the messageinput from listening
       inputRef.current?.focus();
     };
     const handleClickOutside = (event) => {
@@ -45,11 +49,16 @@ const CreateServerMenu = () => {
     };
     document.addEventListener("click", handleClickOutside);
     document.addEventListener("keydown", handleKeyDown);
+
+    if (!serverMenu.visible) {
+      document.removeEventListener("click", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    }
     return () => {
       document.removeEventListener("click", handleClickOutside);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [onClose]);
+  }, [onClose, serverMenu.visible]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -134,7 +143,7 @@ const CreateServerMenu = () => {
       in={serverMenu.visible}
       nodeRef={menuRef}
       timeout={200}
-      classNames="channel-menu"
+      classNames="modal-menu"
       unmountOnExit
       onEntering={() => {
         setButtonsDisabled(true);
@@ -170,7 +179,7 @@ const CreateServerMenu = () => {
                     style={{ fontSize: "0px" }}
                     type="file"
                     accept=".jpg,.jpeg,.png,.gif,.webp"
-                    className="absolute top-0 h-full w-full opacity-0 hover:cursor-pointer"
+                    className="absolute left-0 top-0 h-full w-full opacity-0 hover:cursor-pointer"
                   />
                 </div>
               </div>
