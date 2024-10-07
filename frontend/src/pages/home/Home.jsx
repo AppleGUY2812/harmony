@@ -40,15 +40,6 @@ const Home = () => {
               </>
             }
           />
-
-          {/* {!selectedServer && discoverServersVisible ? (
-            <DiscoverServers />
-          ) : (
-            <>
-              <Sidebar />
-              <MessageContainer />
-            </>
-          )} */}
         </Routes>
 
         <div className="select-none">
