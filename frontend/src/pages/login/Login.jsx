@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import Field from "../../components/SignupField/Field";
+import GuestButton from "../../components/GuestButton/GuestButton";
 import { useCallback, useState } from "react";
 import useLogin from "../../hooks/useLogin";
 
@@ -50,6 +51,7 @@ const Login = () => {
           >
             {loading ? <span className="loading loading-spinner" /> : "Login"}
           </button>
+          <GuestButton />
           <Link
             to={"/signup"}
             className="mt-2 text-sm text-cyan-500 hover:cursor-pointer hover:underline"

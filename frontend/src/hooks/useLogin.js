@@ -4,22 +4,19 @@ import toast from "react-hot-toast";
 
 const useLogin = () => {
   const [loading, setLoading] = useState(false);
+  const [guestLoading, setGuestLoading] = useState(false);
   const { setAuthUser } = useAuthContext();
-  const login = async ({ username, password }) => {
-    const success = handleInputErrors({ username, password });
-    if (!success) return;
-    setLoading(true);
+
+  const authenticate = async (path, body, setBusy) => {
+    setBusy(true);
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/auth/login`,
+        `${import.meta.env.VITE_API_URL}/api/auth/${path}`,
         {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            username,
-            password,
-          }),
+          body: body && JSON.stringify(body),
         },
       );
 
@@ -34,11 +31,19 @@ const useLogin = () => {
     } catch (error) {
       toast.error(error.message);
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   };
 
-  return { loading, login };
+  const login = async ({ username, password }) => {
+    const success = handleInputErrors({ username, password });
+    if (!success) return;
+    await authenticate("login", { username, password }, setLoading);
+  };
+
+  const guestLogin = () => authenticate("guest", null, setGuestLoading);
+
+  return { loading, login, guestLoading, guestLogin };
 };
 
 export default useLogin;

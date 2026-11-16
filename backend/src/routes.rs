@@ -15,11 +15,13 @@ pub fn build() -> Rocket<Build> {
             // 10 MiB icon (capped in S3File) plus multipart overhead
             Limits::default().limit("data-form", 11.mebibytes()),
         )))
+        .manage(controllers::auth_routes::GuestLimiter::default())
         .mount(
             "/api/auth",
             routes![
                 controllers::auth_routes::signup,
                 controllers::auth_routes::login,
+                controllers::auth_routes::guest,
                 controllers::auth_routes::logout
             ],
         )
