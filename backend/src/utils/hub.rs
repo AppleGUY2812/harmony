@@ -21,6 +21,8 @@ struct HubState {
     sessions: HashMap<Uuid, Session>,
     by_user: HashMap<i32, HashSet<Uuid>>,
     by_server: HashMap<i32, HashSet<Uuid>>,
+    // bumped by every leave and server delete; see subscribe
+    leaves: u64,
 }
 
 // ponytail: one std Mutex, never held across an await; shard by server if it ever contends
@@ -32,24 +34,49 @@ impl Hub {
         self.0.lock().unwrap()
     }
 
-    pub fn connect(&self, user_id: i32, server_ids: &[i32]) -> (Uuid, mpsc::Receiver<Message>) {
+    // a new session gets joins right away; subscribe it to the user's servers next
+    pub fn connect(&self, user_id: i32) -> (Uuid, mpsc::Receiver<Message>) {
         let id = Uuid::new_v4();
         let (tx, rx) = mpsc::channel(OUTBOX);
         let mut s = self.lock();
-        for server_id in server_ids {
-            s.by_server.entry(*server_id).or_default().insert(id);
-        }
         s.by_user.entry(user_id).or_default().insert(id);
-        let servers = server_ids.iter().copied().collect();
         s.sessions.insert(
             id,
             Session {
                 user_id,
-                servers,
+                servers: HashSet::new(),
                 tx,
             },
         );
         (id, rx)
+    }
+
+    pub fn leaves(&self) -> u64 {
+        self.lock().leaves
+    }
+
+    // Subscribes a session to servers read from the db after `leaves()` returned `leaves`.
+    // False if a leave or server delete happened since: the list may hold a server the
+    // user already left, so read it again.
+    // ponytail: one global counter, so any leave anywhere forces a retry; per-user if that ever spins
+    pub fn subscribe(&self, id: Uuid, server_ids: &[i32], leaves: u64) -> bool {
+        let mut s = self.lock();
+        if s.leaves != leaves {
+            return false;
+        }
+        let HubState {
+            sessions,
+            by_server,
+            ..
+        } = &mut *s;
+        // a dropped session's task ends on its closed outbox
+        if let Some(session) = sessions.get_mut(&id) {
+            for server_id in server_ids {
+                session.servers.insert(*server_id);
+                by_server.entry(*server_id).or_default().insert(id);
+            }
+        }
+        true
     }
 
     pub fn disconnect(&self, id: Uuid) {
@@ -62,6 +89,7 @@ impl Hub {
             sessions,
             by_user,
             by_server,
+            ..
         } = &mut *s;
         for id in by_user.get(&user_id).into_iter().flatten() {
             sessions.get_mut(id).unwrap().servers.insert(server_id);
@@ -71,10 +99,12 @@ impl Hub {
 
     pub fn leave_server(&self, user_id: i32, server_id: i32) {
         let mut s = self.lock();
+        s.leaves += 1;
         let HubState {
             sessions,
             by_user,
             by_server,
+            ..
         } = &mut *s;
         for id in by_user.get(&user_id).into_iter().flatten() {
             sessions.get_mut(id).unwrap().servers.remove(&server_id);
@@ -84,6 +114,7 @@ impl Hub {
 
     pub fn remove_server(&self, server_id: i32) {
         let mut s = self.lock();
+        s.leaves += 1;
         for id in s.by_server.remove(&server_id).into_iter().flatten() {
             s.sessions.get_mut(&id).unwrap().servers.remove(&server_id);
         }
@@ -158,6 +189,12 @@ fn unindex(index: &mut HashMap<i32, HashSet<Uuid>>, key: i32, id: Uuid) {
 mod tests {
     use super::*;
 
+    fn connect(hub: &Hub, user_id: i32, servers: &[i32]) -> (Uuid, mpsc::Receiver<Message>) {
+        let (id, rx) = hub.connect(user_id);
+        assert!(hub.subscribe(id, servers, hub.leaves()));
+        (id, rx)
+    }
+
     fn drain(rx: &mut mpsc::Receiver<Message>) -> Vec<String> {
         std::iter::from_fn(|| rx.try_recv().ok())
             .map(|m| m.into_text().unwrap())
@@ -167,9 +204,9 @@ mod tests {
     #[test]
     fn fans_out_to_every_tab_of_a_user() {
         let hub = Hub::default();
-        let (_, mut tab1) = hub.connect(1, &[10]);
-        let (_, mut tab2) = hub.connect(1, &[10]);
-        let (_, mut other) = hub.connect(2, &[]);
+        let (_, mut tab1) = connect(&hub, 1, &[10]);
+        let (_, mut tab2) = connect(&hub, 1, &[10]);
+        let (_, mut other) = connect(&hub, 2, &[]);
 
         hub.send_to_server(10, "a");
         hub.send_to_users(&[1], "b");
@@ -186,8 +223,8 @@ mod tests {
     #[test]
     fn leave_and_remove_server_stop_delivery() {
         let hub = Hub::default();
-        let (_, mut a) = hub.connect(1, &[10, 20]);
-        let (_, mut b) = hub.connect(2, &[10, 20]);
+        let (_, mut a) = connect(&hub, 1, &[10, 20]);
+        let (_, mut b) = connect(&hub, 2, &[10, 20]);
 
         hub.leave_server(1, 10);
         hub.send_to_server(10, "x");
@@ -202,10 +239,24 @@ mod tests {
     }
 
     #[test]
+    fn stale_server_list_is_refused() {
+        let hub = Hub::default();
+        let (id, mut rx) = hub.connect(1);
+        let leaves = hub.leaves();
+        // the user leaves server 10 after its server list was read
+        hub.leave_server(1, 10);
+        assert!(!hub.subscribe(id, &[10], leaves));
+        // the reread list no longer has it
+        assert!(hub.subscribe(id, &[], hub.leaves()));
+        hub.send_to_server(10, "x");
+        assert!(drain(&mut rx).is_empty());
+    }
+
+    #[test]
     fn full_outbox_drops_only_that_session() {
         let hub = Hub::default();
-        let (slow, _slow_rx) = hub.connect(1, &[10]);
-        let (fast, mut fast_rx) = hub.connect(2, &[10]);
+        let (slow, _slow_rx) = connect(&hub, 1, &[10]);
+        let (fast, mut fast_rx) = connect(&hub, 2, &[10]);
 
         for _ in 0..OUTBOX {
             hub.send_to_server(10, "m");
@@ -225,7 +276,7 @@ mod tests {
     #[test]
     fn disconnect_cleans_every_index() {
         let hub = Hub::default();
-        let (id, mut rx) = hub.connect(1, &[10]);
+        let (id, mut rx) = connect(&hub, 1, &[10]);
         hub.join_server(1, 20);
         hub.disconnect(id);
 

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useState } from "react";
 import PropTypes from "prop-types";
 
 export const AuthContext = createContext(null);
@@ -16,10 +16,11 @@ export const AuthContextProvider = ({ children }) => {
     localStorage.setItem("user-info", JSON.stringify(newUser));
     setAuthUser(newUser);
   };
-  const removeLocalStorageAuthUser = () => {
+  // stable: the websocket effect calls it
+  const removeLocalStorageAuthUser = useCallback(() => {
     localStorage.removeItem("user-info");
     setAuthUser(null);
-  };
+  }, []);
 
   return (
     <AuthContext.Provider

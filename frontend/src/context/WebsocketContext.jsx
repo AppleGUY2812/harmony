@@ -13,7 +13,7 @@ export const useWebsocketContext = () => {
 export const WebsocketContextProvider = ({ children }) => {
   const [websocket, setWebsocket] = useState(null);
   const [epoch, setEpoch] = useState(0);
-  const { authUser } = useAuthContext();
+  const { authUser, removeLocalStorageAuthUser } = useAuthContext();
   const userId = authUser?.user_id;
 
   useEffect(() => {
@@ -27,6 +27,19 @@ export const WebsocketContextProvider = ({ children }) => {
     let opened = false;
     let stopped = false;
 
+    // a rejected upgrade looks like any other close: after a few, see if we were logged out
+    const checkAuth = async () => {
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/servers/get/Server`,
+          { credentials: "include" },
+        );
+        if (res.status === 401 && !stopped) removeLocalStorageAuthUser();
+      } catch {
+        // server unreachable: keep retrying
+      }
+    };
+
     const connect = () => {
       clearTimeout(timer);
       ws = new WebSocket(`${base}/ws/chat_ws/${userId}`);
@@ -37,6 +50,7 @@ export const WebsocketContextProvider = ({ children }) => {
       };
       ws.onclose = () => {
         if (stopped) return;
+        if (attempts >= 3) checkAuth();
         // exponential backoff with full jitter, capped at 15s
         const delay = Math.random() * Math.min(15000, 500 * 2 ** attempts++);
         timer = setTimeout(connect, delay);
@@ -61,7 +75,7 @@ export const WebsocketContextProvider = ({ children }) => {
       ws.close();
       setWebsocket(null);
     };
-  }, [userId]);
+  }, [userId, removeLocalStorageAuthUser]);
 
   return (
     <WebsocketContext.Provider value={{ websocket, epoch }}>

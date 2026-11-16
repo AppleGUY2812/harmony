@@ -9,6 +9,9 @@ const Servers = () => {
   const { loading, servers: fetchedServers } = useGetServers("Server");
   const servers = useServerStore((state) => state.servers);
   const setServers = useServerStore((state) => state.setServers);
+  const updateServerUnread = useServerStore(
+    (state) => state.updateServerUnread,
+  );
   const setSelectedConversation = useServerStore(
     (state) => state.setSelectedConversation,
   );
@@ -20,8 +23,11 @@ const Servers = () => {
   useEffect(() => {
     if (fetchedServers) {
       setServers(fetchedServers);
+      // a refetch after a reconnect can count the open server's messages as unread
+      const { selectedServer, selectedChannel } = useServerStore.getState();
+      if (selectedChannel) updateServerUnread(selectedServer.server_id, 0);
     }
-  }, [fetchedServers, setServers]);
+  }, [fetchedServers, setServers, updateServerUnread]);
 
   const handleServerClick = useCallback(
     (server) => {

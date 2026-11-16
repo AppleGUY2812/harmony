@@ -6,6 +6,7 @@ use crate::utils::hub::Hub;
 use rocket::futures::{SinkExt, StreamExt};
 use rocket::get;
 use rocket::http::Status;
+use rocket::request::{FromRequest, Outcome, Request};
 use rocket::State;
 use sqlx::PgPool;
 use std::sync::Arc;
@@ -22,6 +23,7 @@ const IDLE: Duration = Duration::from_secs(60);
 pub async fn websocket_handler(
     ws: WebSocket,
     user_id: i32,
+    _origin: SameHost,
     guard: JwtGuard,
     hub: &State<Arc<Hub>>,
     sfu: &State<Arc<Sfu>>,
@@ -33,12 +35,6 @@ pub async fn websocket_handler(
     let hub = Arc::clone(hub);
     let sfu = Arc::clone(sfu);
     let pool = PgPool::clone(db);
-    let server_ids =
-        sqlx::query_scalar::<_, i32>("SELECT server_id FROM users_servers WHERE user_id = $1")
-            .bind(user_id)
-            .fetch_all(&pool)
-            .await
-            .map_err(|_| Status::InternalServerError)?;
 
     // inbound messages are only call signaling; an SDP answer is a few KiB
     let limit = Some(256 << 10);
@@ -49,7 +45,12 @@ pub async fn websocket_handler(
     });
     Ok(ws.channel(move |mut stream| {
         Box::pin(async move {
-            let (session_id, mut outbox) = hub.connect(user_id, &server_ids);
+            // registered before the server list is read, so no join or leave is missed
+            let (session_id, mut outbox) = hub.connect(user_id);
+            if subscribe(&hub, session_id, user_id, &pool).await.is_err() {
+                hub.disconnect(session_id);
+                return Ok(());
+            }
             let mut ping = interval(PING_EVERY);
             let mut last_seen = Instant::now();
 
@@ -85,6 +86,63 @@ pub async fn websocket_handler(
             Ok(())
         })
     }))
+}
+
+// read again when a leave lands between the read and subscribing, so an ex-member is never subscribed
+async fn subscribe(
+    hub: &Hub,
+    session_id: uuid::Uuid,
+    user_id: i32,
+    pool: &PgPool,
+) -> sqlx::Result<()> {
+    loop {
+        let leaves = hub.leaves();
+        let server_ids =
+            sqlx::query_scalar::<_, i32>("SELECT server_id FROM users_servers WHERE user_id = $1")
+                .bind(user_id)
+                .fetch_all(pool)
+                .await?;
+        if hub.subscribe(session_id, &server_ids, leaves) {
+            return Ok(());
+        }
+    }
+}
+
+// The JWT cookie is SameSite=None, so any site's page could open this socket with it
+// (cross-site websocket hijacking). Browsers always send Origin on an upgrade: it must be
+// this host. The port is ignored because dev serves the page from vite on another port.
+pub struct SameHost;
+
+#[rocket::async_trait]
+impl<'r> FromRequest<'r> for SameHost {
+    type Error = ();
+    async fn from_request(req: &'r Request<'_>) -> Outcome<Self, ()> {
+        let headers = req.headers();
+        match headers.get_one("Origin") {
+            // not a browser
+            None => Outcome::Success(SameHost),
+            Some(origin) if same_host(origin, headers.get_one("Host").unwrap_or("")) => {
+                Outcome::Success(SameHost)
+            }
+            Some(_) => Outcome::Error((Status::Forbidden, ())),
+        }
+    }
+}
+
+fn same_host(origin: &str, host: &str) -> bool {
+    let origin = hostname(origin.split_once("://").map_or("", |(_, rest)| rest));
+    let host = hostname(host);
+    let loopback = |h: &str| matches!(h, "localhost" | "127.0.0.1" | "::1");
+    !origin.is_empty()
+        && (origin.eq_ignore_ascii_case(host) || (loopback(origin) && loopback(host)))
+}
+
+// "host:port" or "[v6]:port" -> host
+fn hostname(authority: &str) -> &str {
+    match authority.strip_prefix('[') {
+        Some(v6) => v6.split(']').next().unwrap_or(""),
+        None => authority.split(':').next().unwrap_or(""),
+    }
 }
 
 // incoming messages are call signaling
@@ -137,7 +195,23 @@ async fn can_join(pool: &PgPool, user_id: i32, channel_id: i32) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use super::same_host;
     use crate::models::{CallClientEvent, IceCandidate};
+
+    #[test]
+    fn origin_must_be_this_host() {
+        assert!(same_host("https://harmonyapp.xyz", "harmonyapp.xyz"));
+        assert!(same_host("https://10.0.0.5", "10.0.0.5:443"));
+        assert!(same_host("http://localhost:3000", "127.0.0.1:5500"));
+        assert!(same_host("http://[::1]:3000", "[::1]:5500"));
+        assert!(!same_host("https://evil.com", "harmonyapp.xyz"));
+        assert!(!same_host(
+            "https://harmonyapp.xyz.evil.com",
+            "harmonyapp.xyz"
+        ));
+        assert!(!same_host("http://localhost:3000", "harmonyapp.xyz"));
+        assert!(!same_host("null", ""));
+    }
 
     fn parse(json: &str) -> Option<CallClientEvent> {
         serde_json::from_str(json).ok()

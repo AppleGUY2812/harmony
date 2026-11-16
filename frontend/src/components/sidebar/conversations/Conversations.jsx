@@ -12,6 +12,9 @@ const Conversations = () => {
 
   const conversations = useServerStore((state) => state.conversations);
   const setConversations = useServerStore((state) => state.setConversations);
+  const updateConversationUnread = useServerStore(
+    (state) => state.updateConversationUnread,
+  );
 
   const setSelectedConversation = useServerStore(
     (state) => state.setSelectedConversation,
@@ -26,10 +29,12 @@ const Conversations = () => {
   const { loading, conversations: fetchedConversations } =
     useConversationInfo("Dm");
 
-  useEffect(
-    () => setConversations(fetchedConversations),
-    [fetchedConversations, setConversations],
-  );
+  useEffect(() => {
+    setConversations(fetchedConversations);
+    // a refetch after a reconnect can count the open DM's messages as unread
+    const { selectedServer, selectedChannel } = useServerStore.getState();
+    if (selectedChannel) updateConversationUnread(selectedServer.server_id, 0);
+  }, [fetchedConversations, setConversations, updateConversationUnread]);
 
   const handleConversationClick = useCallback(
     (conversation) => {
