@@ -18,9 +18,8 @@ CREATE TABLE servers (
     admins INTEGER[] NOT NULL DEFAULT '{}',
     s3_icon_key TEXT,
     last_message_at TIMESTAMPTZ,
-    last_message_id BIGINT REFERENCES messages (message_id)
+    last_message_id BIGINT
 );
-CREATE INDEX idx_server_id_hash ON servers USING hash (server_id);
 CREATE EXTENSION pg_trgm;
 CREATE INDEX server_name_trgm_idx ON servers USING gin (server_name gin_trgm_ops);
 
@@ -29,9 +28,8 @@ CREATE TABLE users_servers (
     server_id INTEGER NOT NULL REFERENCES servers (server_id) ON DELETE CASCADE,
     PRIMARY KEY(user_id, server_id),
     joined_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    last_read_message_id BIGINT REFERENCES messages (message_id)
+    last_read_message_id BIGINT
 );
-CREATE INDEX idx_user_server_btree ON users_servers (user_id, server_id);
 
 
 CREATE TABLE channels (
@@ -39,7 +37,6 @@ CREATE TABLE channels (
     server_id INTEGER NOT NULL REFERENCES servers (server_id) ON DELETE CASCADE,
     channel_name TEXT NOT NULL DEFAULT 'channel'::text
 );
-CREATE INDEX idx_channel_id_hash ON channels USING hash (channel_id);
 
 
 CREATE TABLE messages (
@@ -52,4 +49,11 @@ CREATE TABLE messages (
     display_username TEXT NOT NULL,
     s3_icon_key TEXT
 );
+-- ASC is fine: a btree is scanned backward for ORDER BY message_id DESC (newest page),
+-- and forward for the unread count (message_id > last_read).
+CREATE INDEX idx_messages_channel_message ON messages (channel_id, message_id);
+-- users_routes.rs updates s3_icon_key by user_id on every icon change
 CREATE INDEX idx_user_id_hash ON messages USING hash (user_id);
+-- messages is created after servers/users_servers, so these FKs are added last
+ALTER TABLE servers ADD FOREIGN KEY (last_message_id) REFERENCES messages (message_id);
+ALTER TABLE users_servers ADD FOREIGN KEY (last_read_message_id) REFERENCES messages (message_id);

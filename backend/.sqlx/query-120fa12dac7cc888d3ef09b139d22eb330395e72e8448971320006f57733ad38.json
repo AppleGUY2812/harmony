@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT\n        server_id, server_type AS \"server_type!: ServerType\", members, server_name, admins, s3_icon_key, last_message_at, last_message_id\n        FROM servers\n        WHERE server_type = 'server' AND server_name % $1\n        ORDER BY (SIMILARITY(server_name, 'skibidi') * 0.3 + LOG(members + 1) * 0.7) DESC\n        LIMIT 100",
+  "query": "SELECT\n        server_id, server_type AS \"server_type!: ServerType\", members, server_name, admins, s3_icon_key, last_message_at, last_message_id\n        FROM servers\n        WHERE server_type = 'server' AND server_name % $1\n        ORDER BY (SIMILARITY(server_name, $1) * 0.3 + LOG(members + 1) * 0.7) DESC\n        LIMIT 100",
   "describe": {
     "columns": [
       {
@@ -71,5 +71,5 @@
       true
     ]
   },
-  "hash": "72eabd49e1c6c4b49776937a17112f34cbcf723c4dfb7d0e07ef691c7e9eed6f"
+  "hash": "120fa12dac7cc888d3ef09b139d22eb330395e72e8448971320006f57733ad38"
 }

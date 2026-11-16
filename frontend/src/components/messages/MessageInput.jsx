@@ -1,28 +1,22 @@
 import { IoSend } from "react-icons/io5";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import useSendMessage from "../../hooks/useSendMessage.js";
-import { useAuthContext } from "../../context/AuthContext.jsx";
 import { usePopupContext } from "../popups/PopupContext.jsx";
 import toast from "react-hot-toast";
 const MessageInput = () => {
-  const { loading, sendMessage } = useSendMessage();
+  const { sendMessage } = useSendMessage();
   const [message, setMessage] = useState("");
   const textareaRef = useRef(null);
   const formRef = useRef(null);
-  const { authUser } = useAuthContext();
   const { popupActive } = usePopupContext();
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     if (message.length >= 600) {
       toast.error("Message longer than 600 characters");
-    } else if (message) {
-      await sendMessage(
-        message,
-        authUser.display_username,
-        authUser.s3_icon_key,
-      );
+    } else if (message.trim()) {
+      sendMessage(message);
       setMessage("");
     }
   };

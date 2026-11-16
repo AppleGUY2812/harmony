@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useWebsocketContext } from "../../context/WebsocketContext";
 import useServerStore from "../../zustand/useServerStore";
 import toast from "react-hot-toast";
 import useUpdateLastReadMessage from "../useUpdateLastReadMessage";
+import { upsertMessage } from "../useSendMessage";
 const useListenMessages = () => {
   const { websocket } = useWebsocketContext();
-  const addMessage = useServerStore((state) => state.addMessage);
   const selectedChannel = useServerStore((state) => state.selectedChannel);
   const selectedServer = useServerStore((state) => state.selectedServer);
   const updateConversationUnread = useServerStore(
@@ -28,7 +28,6 @@ const useListenMessages = () => {
     const handleIncomingMessage = (event) => {
       try {
         const ws_event = JSON.parse(event.data);
-        console.log(ws_event);
         if (ws_event.event_type === "Message") {
           // update the order of conversations
           // IMPORTANT, needs to go before updating unread count, or this will set an old unread count
@@ -55,7 +54,7 @@ const useListenMessages = () => {
           if (
             ws_event.data.message.channel_id === selectedChannel?.channel_id
           ) {
-            addMessage(ws_event.data.message);
+            upsertMessage(ws_event.data.message, ws_event.data.nonce);
             UpdateLastReadMessage(
               selectedServer.server_id,
               ws_event.data.message.message_id,
@@ -84,8 +83,6 @@ const useListenMessages = () => {
     };
   }, [
     websocket,
-    addMessage,
-
     UpdateLastReadMessage,
     conversations,
     selectedChannel?.channel_id,
