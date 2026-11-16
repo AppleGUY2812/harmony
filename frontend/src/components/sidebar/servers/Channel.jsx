@@ -1,10 +1,12 @@
 import PropTypes from "prop-types";
 import { TbBrandAmongUs } from "react-icons/tb";
-import useServer from "../../../zustand/useServer";
+import useServerStore from "../../../zustand/useServerStore";
 
 const Channel = ({ channel }) => {
-  const setSelectedChannel = useServer((state) => state.setSelectedChannel);
-  const selectedChannel = useServer((state) => state.selectedChannel);
+  const setSelectedChannel = useServerStore(
+    (state) => state.setSelectedChannel,
+  );
+  const selectedChannel = useServerStore((state) => state.selectedChannel);
 
   const isSelected = selectedChannel?.channel_id === channel.channel_id;
 

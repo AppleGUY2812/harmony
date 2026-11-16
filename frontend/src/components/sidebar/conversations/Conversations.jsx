@@ -3,21 +3,23 @@ import Conversation from "./Conversation";
 import toast from "react-hot-toast";
 import { useCallback, useEffect, useMemo } from "react";
 import useConversationInfo from "../../../hooks/useConversationInfo";
-import useServer from "../../../zustand/useServer";
+import useServerStore from "../../../zustand/useServerStore";
 
 // TODO: START CACHEING EVERYTHING
 // TODO: make last messaged conversation the top
 const Conversations = () => {
   // useWebsocketContext();
 
-  const conversations = useServer((state) => state.conversations);
-  const setConversations = useServer((state) => state.setConversations);
+  const conversations = useServerStore((state) => state.conversations);
+  const setConversations = useServerStore((state) => state.setConversations);
 
-  const setSelectedConversation = useServer(
+  const setSelectedConversation = useServerStore(
     (state) => state.setSelectedConversation,
   );
-  const setSelectedServer = useServer((state) => state.setSelectedServer);
-  const setSelectedChannel = useServer((state) => state.setSelectedChannel);
+  const setSelectedServer = useServerStore((state) => state.setSelectedServer);
+  const setSelectedChannel = useServerStore(
+    (state) => state.setSelectedChannel,
+  );
 
   // TODO: put groupchats in here
   // TODO: handle the server name in the backend?

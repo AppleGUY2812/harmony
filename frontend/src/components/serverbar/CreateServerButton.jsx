@@ -1,6 +1,6 @@
 import PropTypes from "prop-types";
 import { usePopupContext } from "../popups/PopupContext";
-import useServer from "../../zustand/useServer";
+import useServerStore from "../../zustand/useServerStore";
 import { IoIosAddCircle } from "react-icons/io";
 
 const CreateServerButton = () => {

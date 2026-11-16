@@ -9,7 +9,7 @@ import InfoTooltip from "../../components/popups/tooltip/InfoTooltip";
 import CreateChannelMenu from "../../components/popups/createChannel/CreateChannelMenu";
 import ModalOverlay from "../../components/popups/ModalOverlay";
 import { useState } from "react";
-import useServer from "../../zustand/useServer";
+import useServerStore from "../../zustand/useServerStore";
 import CreateServerMenu from "../../components/popups/createServer/CreateServerMenu";
 import { Navigate, Route, Routes, Router } from "react-router-dom";
 import ServerSettingsMenu from "../../components/popups/serverSettings/ServerSettingsMenu";
@@ -18,7 +18,7 @@ import useListenServerCreated from "../../hooks/websocketListeners/useListenServ
 import useListenMessages from "../../hooks/websocketListeners/useListenMessages";
 
 const MobileHome = () => {
-  const selectedServer = useServer((state) => state.selectedServer);
+  const selectedServer = useServerStore((state) => state.selectedServer);
   useListenServerCreated();
   useListenMessages();
   return (

@@ -1,12 +1,12 @@
 import { useEffect } from "react";
 import { useWebsocketContext } from "../../context/WebsocketContext";
-import useServer from "../../zustand/useServer";
+import useServerStore from "../../zustand/useServerStore";
 import toast from "react-hot-toast";
 
 const useListenServerCreated = () => {
   const { websocket } = useWebsocketContext();
-  const addConversation = useServer((state) => state.addConversation);
-  const addServer = useServer((state) => state.addServer);
+  const addConversation = useServerStore((state) => state.addConversation);
+  const addServer = useServerStore((state) => state.addServer);
   useEffect(() => {
     if (!websocket) return;
     const handleIncomingMessage = (event) => {

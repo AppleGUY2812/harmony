@@ -1,19 +1,21 @@
 import { useCallback, useEffect, useMemo } from "react";
 import useGetServers from "../../hooks/useGetServers";
 import Server from "./Server";
-import useServer from "../../zustand/useServer";
+import useServerStore from "../../zustand/useServerStore";
 import toast from "react-hot-toast";
 import Conversation from "../sidebar/conversations/Conversation";
 
 const Servers = () => {
   const { loading, servers: fetchedServers } = useGetServers("Server");
-  const servers = useServer((state) => state.servers);
-  const setServers = useServer((state) => state.setServers);
-  const setSelectedConversation = useServer(
+  const servers = useServerStore((state) => state.servers);
+  const setServers = useServerStore((state) => state.setServers);
+  const setSelectedConversation = useServerStore(
     (state) => state.setSelectedConversation,
   );
-  const setSelectedServer = useServer((state) => state.setSelectedServer);
-  const setSelectedChannel = useServer((state) => state.setSelectedChannel);
+  const setSelectedServer = useServerStore((state) => state.setSelectedServer);
+  const setSelectedChannel = useServerStore(
+    (state) => state.setSelectedChannel,
+  );
 
   useEffect(() => {
     if (fetchedServers) {

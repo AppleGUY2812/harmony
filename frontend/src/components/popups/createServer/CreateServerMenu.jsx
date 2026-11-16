@@ -3,7 +3,7 @@ import { CSSTransition } from "react-transition-group";
 import { IoIosClose } from "react-icons/io";
 import PropTypes from "prop-types";
 import { usePopupContext } from "../PopupContext";
-import useServer from "../../../zustand/useServer";
+import useServerStore from "../../../zustand/useServerStore";
 import toast from "react-hot-toast";
 import { useAuthContext } from "../../../context/AuthContext";
 import useCreateServer from "../../../hooks/useCreateServer";
@@ -11,8 +11,10 @@ import UploadImageIcon from "./UploadImageIcon";
 
 const CreateServerMenu = () => {
   const menuRef = useRef(null);
-  const setSelectedServer = useServer((state) => state.setSelectedServer);
-  const setSelectedChannel = useServer((state) => state.setSelectedChannel);
+  const setSelectedServer = useServerStore((state) => state.setSelectedServer);
+  const setSelectedChannel = useServerStore(
+    (state) => state.setSelectedChannel,
+  );
   const [buttonsDisabled, setButtonsDisabled] = useState(false);
   const { createServer } = useCreateServer();
   const { serverMenu, setServerMenuVisible, setModalOverlayVisible } =
@@ -175,7 +177,7 @@ const CreateServerMenu = () => {
           <fieldset disabled={buttonsDisabled}>
             <div className="w-[460px] rounded-md bg-base-100 p-4">
               <div className="mb-4 flex items-center justify-between">
-                <h1 className="text-content-header text-xl font-bold">
+                <h1 className="text-xl font-bold text-content-header">
                   Create Server
                 </h1>
                 <button
@@ -206,10 +208,10 @@ const CreateServerMenu = () => {
                 </div>
               </div>
               <div className="mb-8">
-                <h2 className="text-button mb-2 text-xs font-bold">
+                <h2 className="mb-2 text-xs font-bold text-button">
                   SERVER NAME
                 </h2>
-                <div className="bg-base-400 text-content-normal h-10 rounded-md pl-2">
+                <div className="h-10 rounded-md bg-base-400 pl-2 text-content-normal">
                   <input
                     onKeyDown={handleInputKeyDown}
                     ref={inputRef}
@@ -224,13 +226,13 @@ const CreateServerMenu = () => {
               <div className="flex justify-end gap-2">
                 <button
                   onClick={onClose}
-                  className="text-button h-9 rounded-md px-4 hover:underline"
+                  className="h-9 rounded-md px-4 text-button hover:underline"
                 >
                   Cancel
                 </button>
                 <button
                   disabled={!serverName || serverName.length > 30}
-                  className={`text-content-normal h-9 rounded-md ${!serverName || serverName.length > 30 ? "cursor-not-allowed bg-error" : "bg-primary"} px-4`}
+                  className={`h-9 rounded-md text-content-normal ${!serverName || serverName.length > 30 ? "cursor-not-allowed bg-error" : "bg-primary"} px-4`}
                 >
                   Create Server
                 </button>

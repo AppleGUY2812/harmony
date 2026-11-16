@@ -1,16 +1,16 @@
 import { RiArrowDropDownLine } from "react-icons/ri";
 import { usePopupContext } from "../../popups/PopupContext";
-import useServer from "../../../zustand/useServer";
+import useServerStore from "../../../zustand/useServerStore";
 
 const ServerHeader = () => {
   const { toggleServerDropdown } = usePopupContext();
-  const selectedServer = useServer((state) => state.selectedServer);
+  const selectedServer = useServerStore((state) => state.selectedServer);
   const handleClick = (event) => {
     event.stopPropagation();
     toggleServerDropdown();
   };
   return (
-    <header className="border-base-400 h-12 border-b px-4 py-3">
+    <header className="h-12 border-b border-base-400 px-4 py-3">
       <div
         onClick={handleClick}
         className="flex cursor-pointer items-center justify-between rounded-md font-semibold text-neutral-200"

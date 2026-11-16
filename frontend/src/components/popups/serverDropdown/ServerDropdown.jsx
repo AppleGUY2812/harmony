@@ -7,16 +7,18 @@ import { VscSignOut } from "react-icons/vsc";
 import { IoIosSettings } from "react-icons/io";
 
 import DropdownItem from "./DropdownItem";
-import useServer from "../../../zustand/useServer";
+import useServerStore from "../../../zustand/useServerStore";
 import { useAuthContext } from "../../../context/AuthContext";
 import useLeaveServer from "../../../hooks/useLeaveServer";
 import useDeleteServer from "../../../hooks/useDeleteServer";
 
 const ServerDropdown = () => {
   const dropdownRef = useRef(null);
-  const selectedServer = useServer((state) => state.selectedServer);
-  const setSelectedServer = useServer((state) => state.setSelectedServer);
-  const setSelectedChannel = useServer((state) => state.setSelectedChannel);
+  const selectedServer = useServerStore((state) => state.selectedServer);
+  const setSelectedServer = useServerStore((state) => state.setSelectedServer);
+  const setSelectedChannel = useServerStore(
+    (state) => state.setSelectedChannel,
+  );
   const { authUser } = useAuthContext();
   const {
     serverDropdown,

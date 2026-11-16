@@ -283,6 +283,10 @@ pub enum WebRTCWebSocketEvent {
         to: i32,
         from: i32,
     },
+    EndCall {
+        to: i32,
+        from: i32,
+    },
 }
 
 #[derive(Serialize)]

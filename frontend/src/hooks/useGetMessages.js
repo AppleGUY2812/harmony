@@ -1,18 +1,20 @@
 import { useCallback, useEffect, useState } from "react";
-import useServer from "../zustand/useServer";
+import useServerStore from "../zustand/useServerStore";
 import toast from "react-hot-toast";
 import useUpdateLastReadMessage from "./useUpdateLastReadMessage";
 
 const useGetMessages = () => {
   const [loading, setLoading] = useState(false);
-  const selectedServer = useServer((state) => state.selectedServer);
-  const selectedChannel = useServer((state) => state.selectedChannel);
+  const selectedServer = useServerStore((state) => state.selectedServer);
+  const selectedChannel = useServerStore((state) => state.selectedChannel);
   const { UpdateLastReadMessage } = useUpdateLastReadMessage();
 
-  const updateConversationUnread = useServer(
+  const updateConversationUnread = useServerStore(
     (state) => state.updateConversationUnread,
   );
-  const updateServerUnread = useServer((state) => state.updateServerUnread);
+  const updateServerUnread = useServerStore(
+    (state) => state.updateServerUnread,
+  );
 
   // const messages = useServer((state) => state.messages);
   // const setMessages = useServer((state) => state.setMessages);

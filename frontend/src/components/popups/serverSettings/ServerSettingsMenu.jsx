@@ -5,17 +5,17 @@ import { IoIosClose } from "react-icons/io";
 import PropTypes from "prop-types";
 import { usePopupContext } from "../PopupContext";
 import useCreateChannel from "../../../hooks/useCreateChannel";
-import useServer from "../../../zustand/useServer";
+import useServerStore from "../../../zustand/useServerStore";
 
 import toast from "react-hot-toast";
 import useEditServer from "../../../hooks/useEditServer";
 const ServerSettingsMenu = () => {
   const menuRef = useRef(null);
   const inputRef = useRef(null);
-  const selectedServer = useServer((state) => state.selectedServer);
-  const setSelectedServer = useServer((state) => state.setSelectedServer);
-  const servers = useServer((state) => state.servers);
-  const setServers = useServer((state) => state.setServers);
+  const selectedServer = useServerStore((state) => state.selectedServer);
+  const setSelectedServer = useServerStore((state) => state.setSelectedServer);
+  const servers = useServerStore((state) => state.servers);
+  const setServers = useServerStore((state) => state.setServers);
   const [buttonsDisabled, setButtonsDisabled] = useState(false);
   const {
     serverSettingsMenu,

@@ -1,12 +1,12 @@
 import PropTypes from "prop-types";
 import { usePopupContext } from "../popups/PopupContext";
-import useServer from "../../zustand/useServer";
+import useServerStore from "../../zustand/useServerStore";
 import { useMemo } from "react";
 
 const Server = ({ server, handleClick }) => {
   const { handleServerHover } = usePopupContext();
 
-  const selectedServer = useServer((state) => state.selectedServer);
+  const selectedServer = useServerStore((state) => state.selectedServer);
 
   const serverName = server.server_name;
 

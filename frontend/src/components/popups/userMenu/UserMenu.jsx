@@ -5,7 +5,7 @@ import { IoIosClose } from "react-icons/io";
 import { RiMessage3Line } from "react-icons/ri";
 import { useAuthContext } from "../../../context/AuthContext";
 import useCreateServer from "../../../hooks/useCreateServer";
-import useServer from "../../../zustand/useServer";
+import useServerStore from "../../../zustand/useServerStore";
 import useGetDm from "../../../hooks/useGetDm";
 import useImageUpload from "../../../utils/useImageUpload";
 import toast from "react-hot-toast";
@@ -18,8 +18,13 @@ const UserMenu = () => {
   const { authUser, setLocalStorageAuthUser } = useAuthContext();
   const { createServer } = useCreateServer();
   const [buttonsDisabled, setButtonsDisabled] = useState(false);
-  const setSelectedServer = useServer((state) => state.setSelectedServer);
-  const setSelectedChannel = useServer((state) => state.setSelectedChannel);
+  const setSelectedServer = useServerStore((state) => state.setSelectedServer);
+  const setSelectedChannel = useServerStore(
+    (state) => state.setSelectedChannel,
+  );
+  const setSelectedConversation = useServerStore(
+    (state) => state.setSelectedConversation,
+  );
 
   const {
     icon,
@@ -75,6 +80,11 @@ const UserMenu = () => {
       // uselistendm will add it to conversations state
       setSelectedServer(existingServer);
       setSelectedChannel(existingChannel);
+      setSelectedConversation({
+        server: existingServer,
+        channel: existingChannel,
+        users: [userMenu.user],
+      });
     } else {
       // TODO: decide on how to handle the name?
       const { server: newServer, channel: newChannel } = await createServer(
@@ -87,6 +97,11 @@ const UserMenu = () => {
         // server added in listen server created
         setSelectedServer(newServer);
         setSelectedChannel(newChannel);
+        setSelectedConversation({
+          server: newServer,
+          channel: newChannel,
+          users: [userMenu.user],
+        });
       }
     }
     onClose();
@@ -123,7 +138,7 @@ const UserMenu = () => {
       <div className="absolute left-0 top-0 flex h-screen w-screen items-center justify-center">
         <form onSubmit={handleSubmit} ref={menuRef}>
           <fieldset disabled={buttonsDisabled}>
-            <div className="w-[460px] rounded-md bg-black p-4">
+            <div className="bg-base-500 w-[460px] rounded-md p-4">
               <div className="flex justify-between">
                 <h1 className="text-2xl font-bold text-content-header">
                   {userMenu.user.display_username}

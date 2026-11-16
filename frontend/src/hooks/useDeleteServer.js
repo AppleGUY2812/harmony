@@ -1,11 +1,11 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
-import useServer from "../zustand/useServer";
+import useServerStore from "../zustand/useServerStore";
 
 // usually only for server type server, cause the other server types need serverids and userslist
 const useDeleteServer = () => {
   const [loading, setLoading] = useState(false);
-  const removeServer = useServer((state) => state.removeServer);
+  const removeServer = useServerStore((state) => state.removeServer);
   const deleteServer = async (server_id) => {
     setLoading(true);
     try {

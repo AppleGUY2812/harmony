@@ -1,12 +1,12 @@
 import useGetChannels from "../../../hooks/useGetChannels";
-import useServer from "../../../zustand/useServer";
+import useServerStore from "../../../zustand/useServerStore";
 import Channel from "./Channel";
 import CreateChannelButton from "./CreateChannelButton";
 import { useAuthContext } from "../../../context/AuthContext";
 
 const Channels = () => {
   const { authUser } = useAuthContext();
-  const selectedServer = useServer((state) => state.selectedServer);
+  const selectedServer = useServerStore((state) => state.selectedServer);
   const { loading, channels } = useGetChannels(selectedServer.server_id);
 
   const mapChannels = channels.map((channel) => (

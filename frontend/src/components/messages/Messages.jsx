@@ -1,7 +1,7 @@
 import useGetMessages from "../../hooks/useGetMessages";
 import MessagesSkeleton from "../skeletons/MessagesSkeleton/MessagesSkeleton";
 import Message from "./Message";
-import useServer from "../../zustand/useServer";
+import useServerStore from "../../zustand/useServerStore";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { usePopupContext } from "../popups/PopupContext";
 
@@ -12,9 +12,9 @@ const Messages = () => {
     users: fetchedUsers,
   } = useGetMessages();
 
-  const messages = useServer((state) => state.messages);
-  const setMessages = useServer((state) => state.setMessages);
-  const setUsers = useServer((state) => state.setUsers);
+  const messages = useServerStore((state) => state.messages);
+  const setMessages = useServerStore((state) => state.setMessages);
+  const setUsers = useServerStore((state) => state.setUsers);
   useEffect(() => {
     if (fetchedMessages) {
       setMessages(fetchedMessages);

@@ -15,7 +15,7 @@ const ModalOverlay = () => {
     >
       <div
         ref={modalRef}
-        className="fixed left-0 top-0 h-screen w-screen bg-black opacity-65"
+        className="fixed left-0 top-0 h-screen w-screen bg-black opacity-50"
       ></div>
     </CSSTransition>
   );

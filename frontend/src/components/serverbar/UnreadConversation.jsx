@@ -1,13 +1,15 @@
 import PropTypes from "prop-types";
 import { usePopupContext } from "../popups/PopupContext";
-import useServer from "../../zustand/useServer";
+import useServerStore from "../../zustand/useServerStore";
 import { useMemo } from "react";
 import { useAuthContext } from "../../context/AuthContext";
 
 const UnreadConversation = ({ conversation, handleClick }) => {
   const { handleServerHover } = usePopupContext();
 
-  const selectedConversation = useServer((state) => state.selectedConversation);
+  const selectedConversation = useServerStore(
+    (state) => state.selectedConversation,
+  );
 
   const { authUser } = useAuthContext();
   const user_id = authUser.user_id;

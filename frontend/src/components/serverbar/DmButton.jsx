@@ -1,13 +1,15 @@
 import PropTypes from "prop-types";
 import { usePopupContext } from "../popups/PopupContext";
-import useServer from "../../zustand/useServer";
+import useServerStore from "../../zustand/useServerStore";
 import { IoChatbox } from "react-icons/io5";
 import { useNavigate } from "react-router-dom";
 
 const DmButton = () => {
   const { handleServerHover } = usePopupContext();
-  const setSelectedServer = useServer((state) => state.setSelectedServer);
-  const setSelectedChannel = useServer((state) => state.setSelectedChannel);
+  const setSelectedServer = useServerStore((state) => state.setSelectedServer);
+  const setSelectedChannel = useServerStore(
+    (state) => state.setSelectedChannel,
+  );
   const navigate = useNavigate();
   const name = "Direct Messages";
   const handleMouseEnter = (e) => {

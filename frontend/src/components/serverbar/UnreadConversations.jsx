@@ -1,14 +1,16 @@
 import { useCallback, useMemo } from "react";
-import useServer from "../../zustand/useServer";
+import useServerStore from "../../zustand/useServerStore";
 import UnreadConversation from "./UnreadConversation";
 
 const UnreadConversations = () => {
-  const conversations = useServer((state) => state.conversations);
-  const setSelectedConversation = useServer(
+  const conversations = useServerStore((state) => state.conversations);
+  const setSelectedConversation = useServerStore(
     (state) => state.setSelectedConversation,
   );
-  const setSelectedServer = useServer((state) => state.setSelectedServer);
-  const setSelectedChannel = useServer((state) => state.setSelectedChannel);
+  const setSelectedServer = useServerStore((state) => state.setSelectedServer);
+  const setSelectedChannel = useServerStore(
+    (state) => state.setSelectedChannel,
+  );
 
   const handleConversationClick = useCallback(
     (conversation) => {

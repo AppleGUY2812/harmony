@@ -1,14 +1,16 @@
 import PropTypes from "prop-types";
 import { usePopupContext } from "../popups/PopupContext";
-import useServer from "../../zustand/useServer";
+import useServerStore from "../../zustand/useServerStore";
 
 import { FaCompass } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 
 const JoinServerButton = () => {
   const { handleServerHover } = usePopupContext();
-  const setSelectedServer = useServer((state) => state.setSelectedServer);
-  const setSelectedChannel = useServer((state) => state.setSelectedChannel);
+  const setSelectedServer = useServerStore((state) => state.setSelectedServer);
+  const setSelectedChannel = useServerStore(
+    (state) => state.setSelectedChannel,
+  );
   const navigate = useNavigate();
   const name = "Join a Server";
   const handleMouseEnter = (e) => {

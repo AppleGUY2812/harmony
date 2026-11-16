@@ -1,5 +1,5 @@
 import { useState } from "react";
-import useServer from "../zustand/useServer";
+import useServerStore from "../zustand/useServerStore";
 import toast from "react-hot-toast";
 
 const useGetDm = () => {

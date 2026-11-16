@@ -1,11 +1,11 @@
 import { useState } from "react";
-import useServer from "../zustand/useServer";
+import useServerStore from "../zustand/useServerStore";
 import toast from "react-hot-toast";
 
 const useSendMessage = () => {
   const [loading, setLoading] = useState(false);
-  const selectedChannel = useServer((state) => state.selectedChannel);
-  const selectedServer = useServer((state) => state.selectedServer);
+  const selectedChannel = useServerStore((state) => state.selectedChannel);
+  const selectedServer = useServerStore((state) => state.selectedServer);
 
   const sendMessage = async (message, display_username, s3_icon_key) => {
     setLoading(true);

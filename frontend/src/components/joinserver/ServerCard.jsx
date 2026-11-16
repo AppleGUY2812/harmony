@@ -1,11 +1,13 @@
 import PropTypes from "prop-types";
 import useJoinServer from "../../hooks/useJoinServer";
-import useServer from "../../zustand/useServer";
+import useServerStore from "../../zustand/useServerStore";
 import { useMemo } from "react";
 const ServerCard = ({ server }) => {
   const { loading, joinServer } = useJoinServer();
-  const setSelectedServer = useServer((state) => state.setSelectedServer);
-  const setSelectedChannel = useServer((state) => state.setSelectedChannel);
+  const setSelectedServer = useServerStore((state) => state.setSelectedServer);
+  const setSelectedChannel = useServerStore(
+    (state) => state.setSelectedChannel,
+  );
   const handleClick = async () => {
     await joinServer(server.server_id);
     setSelectedChannel(null);
@@ -40,7 +42,7 @@ const ServerCard = ({ server }) => {
             style={{
               fontSize: `clamp(2.5rem, ${16 / serverNameAbbrev.length}rem, 4rem)`,
             }}
-            className="text-content-normal flex h-48 w-48 items-center justify-center"
+            className="flex h-48 w-48 items-center justify-center text-content-normal"
           >
             {serverNameAbbrev}
           </div>
@@ -48,17 +50,17 @@ const ServerCard = ({ server }) => {
       </div>
 
       <div className="w-full px-2 py-1">
-        <h3 className="text-content-normal truncate text-left font-semibold">
+        <h3 className="truncate text-left font-semibold text-content-normal">
           {server.server_name}
         </h3>
-        <div className="text-content-normal flex items-center justify-between text-xs">
+        <div className="flex items-center justify-between text-xs text-content-normal">
           <div className="flex items-center gap-1">
-            <div className="bg-content-normal h-[8px] w-[8px] rounded-full"></div>
+            <div className="h-[8px] w-[8px] rounded-full bg-content-normal"></div>
             <p>{server.members} Members</p>
           </div>
           <p>
             <span className="select-none">ID: </span>
-            <span className="bg-base-50 rounded-md px-1 py-0.5">
+            <span className="rounded-md bg-base-50 px-1 py-0.5">
               {server.server_id}
             </span>
           </p>

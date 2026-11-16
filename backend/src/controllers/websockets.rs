@@ -32,7 +32,6 @@ pub async fn websocket_handler(
     let websocket_map = websocket_map_state.inner().clone();
     let server_map = server_map_state.0.clone();
     let user_map = user_map_state.0.clone();
-
     let servers = get_all_servers(user_id, &mut db).await.unwrap();
 
     ws.channel(move |stream| {
@@ -97,6 +96,7 @@ pub async fn websocket_handler(
                                         .await;
                                     }
                                     WebRTCWebSocketEvent::Answer { sdp, to, from } => {
+                                        println!("received answer, sending");
                                         // Forward SDP answer to the caller
                                         let answer =
                                             serde_json::to_string(&WebRTCWebSocketEvent::Answer {
@@ -133,6 +133,22 @@ pub async fn websocket_handler(
                                         .unwrap();
                                         broadcast_to_user(
                                             &ice_msg,
+                                            to,
+                                            websocket_map.clone(),
+                                            UserSessionIdMap(user_map.clone()),
+                                        )
+                                        .await;
+                                    }
+                                    WebRTCWebSocketEvent::EndCall { to, from } => {
+                                        let end_call_msg =
+                                            serde_json::to_string(&WebRTCWebSocketEvent::EndCall {
+                                                to,
+                                                from,
+                                            })
+                                            .unwrap();
+
+                                        broadcast_to_user(
+                                            &end_call_msg,
                                             to,
                                             websocket_map.clone(),
                                             UserSessionIdMap(user_map.clone()),

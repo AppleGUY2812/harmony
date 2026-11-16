@@ -3,9 +3,9 @@ import Profilebar from "./Profilebar";
 import SearchInput from "./conversations/SearchInput";
 import ServerHeader from "./servers/ServerHeader";
 import Conversations from "./conversations/Conversations";
-import useServer from "../../zustand/useServer";
+import useServerStore from "../../zustand/useServerStore";
 const Sidebar = () => {
-  const selectedServer = useServer((state) => state.selectedServer);
+  const selectedServer = useServerStore((state) => state.selectedServer);
 
   return (
     <div className="flex h-screen w-60 shrink-0 select-none flex-col gap-3 bg-base-200">

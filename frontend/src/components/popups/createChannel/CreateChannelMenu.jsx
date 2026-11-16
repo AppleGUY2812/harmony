@@ -5,12 +5,12 @@ import { IoIosClose } from "react-icons/io";
 import PropTypes from "prop-types";
 import { usePopupContext } from "../PopupContext";
 import useCreateChannel from "../../../hooks/useCreateChannel";
-import useServer from "../../../zustand/useServer";
+import useServerStore from "../../../zustand/useServerStore";
 import toast from "react-hot-toast";
 const CreateChannelMenu = () => {
   const menuRef = useRef(null);
   const inputRef = useRef(null);
-  const selectedServer = useServer((state) => state.selectedServer);
+  const selectedServer = useServerStore((state) => state.selectedServer);
   const [buttonsDisabled, setButtonsDisabled] = useState(false);
   const { loading, createChannel } = useCreateChannel();
   const { channelMenu, setChannelMenuVisible, setModalOverlayVisible } =

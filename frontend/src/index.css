@@ -142,11 +142,11 @@ input:focus {
   opacity: 0;
 }
 .modal-overlay-enter-active {
-  opacity: 0.65;
+  opacity: 0.5;
   transition: opacity 200ms;
 }
 .modal-overlay-exit {
-  opacity: 0.65;
+  opacity: 0.5;
 }
 .modal-overlay-exit-active {
   opacity: 0;

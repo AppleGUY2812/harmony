@@ -1,19 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useWebsocketContext } from "../../context/WebsocketContext";
-import useServer from "../../zustand/useServer";
+import useServerStore from "../../zustand/useServerStore";
 import toast from "react-hot-toast";
 import useUpdateLastReadMessage from "../useUpdateLastReadMessage";
 const useListenMessages = () => {
   const { websocket } = useWebsocketContext();
-  const addMessage = useServer((state) => state.addMessage);
-  const selectedChannel = useServer((state) => state.selectedChannel);
-  const selectedServer = useServer((state) => state.selectedServer);
-  const updateConversationUnread = useServer(
+  const addMessage = useServerStore((state) => state.addMessage);
+  const selectedChannel = useServerStore((state) => state.selectedChannel);
+  const selectedServer = useServerStore((state) => state.selectedServer);
+  const updateConversationUnread = useServerStore(
     (state) => state.updateConversationUnread,
   );
-  const conversations = useServer((state) => state.conversations);
-  const setConversations = useServer((state) => state.setConversations);
-  const updateServerUnread = useServer((state) => state.updateServerUnread);
+  const conversations = useServerStore((state) => state.conversations);
+  const setConversations = useServerStore((state) => state.setConversations);
+  const updateServerUnread = useServerStore(
+    (state) => state.updateServerUnread,
+  );
   const { UpdateLastReadMessage } = useUpdateLastReadMessage();
 
   const [ping] = useState(new Audio("/harmony_ping_sound.mp3"));

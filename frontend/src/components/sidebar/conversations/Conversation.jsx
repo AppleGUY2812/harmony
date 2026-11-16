@@ -1,5 +1,5 @@
 import PropTypes from "prop-types";
-import useServer from "../../../zustand/useServer";
+import useServerStore from "../../../zustand/useServerStore";
 import { useAuthContext } from "../../../context/AuthContext";
 
 // conversation is a Server that is type DM or GroupChat, and they have only 1 channel
@@ -11,7 +11,7 @@ const Conversation = ({ handleClick, conversation }) => {
   // );
   // const setSelectedServer = useServer((state) => state.setSelectedServer);
   // const setSelectedChannel = useServer((state) => state.setSelectedChannel);
-  const selectedServer = useServer((state) => state.selectedServer);
+  const selectedServer = useServerStore((state) => state.selectedServer);
 
   const serverId = server.server_id;
   const isSelected = selectedServer?.server_id === serverId;

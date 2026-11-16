@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import useServer from "../zustand/useServer";
+import useServerStore from "../zustand/useServerStore";
 import toast from "react-hot-toast";
 
 const useGetUsers = () => {
   const [loading, setLoading] = useState(false);
-  const selectedServer = useServer((state) => state.selectedServer);
-  const users = useServer((state) => state.users);
-  const setUsers = useServer((state) => state.setUsers);
+  const selectedServer = useServerStore((state) => state.selectedServer);
+  const users = useServerStore((state) => state.users);
+  const setUsers = useServerStore((state) => state.setUsers);
 
   useEffect(() => {
     if (!selectedServer?.server_id) return;

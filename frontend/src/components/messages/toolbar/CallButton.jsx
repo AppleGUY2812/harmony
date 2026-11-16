@@ -1,11 +1,12 @@
 import { IoCall } from "react-icons/io5";
-import useWebRTC from "../../hooks/webRTC/useWebRTC";
+import useListenWebRTC from "../../../hooks/webRTC/useListenWebRTC";
 import { useEffect, useRef } from "react";
 const CallButton = ({ user_id }) => {
-  const { localStream, remoteStream, initiateCall } = useWebRTC(user_id);
+  const { localStream, remoteStream, initiateCall } = useListenWebRTC(user_id);
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
 
+  console.log("REMOTE STREMST");
   console.log(remoteStream);
   useEffect(() => {
     if (localStream && localVideoRef.current) {
