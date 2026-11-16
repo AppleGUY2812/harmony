@@ -75,11 +75,6 @@ const useServerStore = create((set) => ({
     set((state) => ({
       conversations: [newConversation, ...state.conversations],
     })),
-
-  // can only call dms rn
-  // {user_id }
-  activeCall: null,
-  setActiveCall: (activeCall) => set({ activeCall }),
 }));
 
 export default useServerStore;

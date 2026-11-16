@@ -1,4 +1,3 @@
-// use rocket::serde::{json::Json, Deserialize, Serialize};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rocket::data::{Capped, ToByteUnit};
@@ -44,11 +43,6 @@ pub struct User {
     pub date_joined: NaiveDate,
 }
 
-// #[derive(Serialize)]
-// pub struct ErrorResponse {
-//     error: String,
-// }
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
     pub sub: i32,
@@ -56,22 +50,19 @@ pub struct Claims {
     pub exp: usize, // Required (validate_exp defaults to true in validation). Expiration time (as UTC timestamp)
 }
 
-#[derive(Deserialize)]
+// ponytail: old clients also send server_id, server_type, display_username and
+// s3_icon_key; serde ignores unknown fields, so they still deserialize and are never trusted.
+#[derive(Deserialize, Validate)]
 pub struct SendMessageInput {
     pub channel_id: i32,
-    pub server_id: i32,
-    pub server_type: ServerType,
+    #[validate(length(min = 1, max = 600))]
     pub message: String,
-    pub display_username: String,
-    pub s3_icon_key: Option<String>,
+    // client-generated id echoed back in the websocket event for optimistic-send matching
+    #[validate(length(max = 64))]
+    pub nonce: Option<String>,
 }
 
-// #[derive(Deserialize)]
-// pub struct GetMessagesInput {
-//     pub channel_id: i32,
-// }
-
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, sqlx::FromRow)]
 pub struct Message {
     pub message_id: i64,
     pub user_id: i32,
@@ -81,17 +72,24 @@ pub struct Message {
     pub display_username: String,
     pub s3_icon_key: Option<String>,
 }
+
+// row returned by the send_message CTE
+#[derive(sqlx::FromRow)]
+pub struct SentMessage {
+    #[sqlx(flatten)]
+    pub message: Message,
+    pub server_id: i32,
+    pub server_type: ServerType,
+}
+
 #[derive(Serialize, Clone)]
 pub struct MessageWithServer {
     pub message: Message,
     pub server_type: ServerType,
     pub server_id: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nonce: Option<String>,
 }
-
-// #[derive(Deserialize)]
-// pub struct GetServersInput<'r> {
-//     pub server_type: &'r str,
-// }
 
 #[derive(sqlx::Type, Deserialize, Serialize, FromFormField, Clone, Copy)]
 #[sqlx(type_name = "server_type", rename_all = "lowercase")]
@@ -133,14 +131,6 @@ pub struct Channel {
     pub channel_name: String,
 }
 
-// #[derive(Deserialize, Validate)]
-// pub struct CreateServerInput {
-//     pub recipient_ids: Vec<i32>,
-//     pub server_type: ServerType,
-//     #[validate(length(min = 1, max = 30))]
-//     pub server_name: String,
-// }
-
 pub struct S3File {
     pub key: String,
     pub data: Capped<Vec<u8>>,
@@ -151,7 +141,10 @@ impl<'r> FromFormField<'r> for S3File {
     async fn from_data(field: DataField<'r, '_>) -> form::Result<'r, Self> {
         // will need to add folder in front of the name
         let file_name = format!("{}", Uuid::new_v4());
-        let bytes = field.data.open(1.mebibytes()).into_bytes().await?;
+        let bytes = field.data.open(10.mebibytes()).into_bytes().await?;
+        if !bytes.is_complete() {
+            return Err(form::Error::validation("image larger than 10 MiB").into());
+        }
 
         Ok(S3File {
             key: file_name,
@@ -226,28 +219,6 @@ pub struct ServerSessionIdMap(pub Arc<Mutex<HashMap<i32, Arc<Mutex<Vec<Uuid>>>>>
 pub fn new_server_sessionid_map() -> ServerSessionIdMap {
     ServerSessionIdMap(Arc::new(Mutex::new(HashMap::new())))
 }
-// Function to print the map
-pub async fn print_server_sessionid_map(
-    map: Arc<tokio::sync::Mutex<HashMap<i32, Arc<tokio::sync::Mutex<Vec<uuid::Uuid>>>>>>,
-) {
-    // Lock the outer Arc<Mutex<HashMap<...>>>
-    let server_map = map.lock().await;
-
-    for (server_id, session_ids_arc) in server_map.iter() {
-        // Lock the inner Arc<Mutex<Vec<Uuid>>>
-        let session_ids = session_ids_arc.lock().await;
-
-        // Print the server ID
-        println!("Server ID: {}", server_id);
-
-        // Print the session IDs for the server
-        println!("Session IDs:");
-        for session_id in session_ids.iter() {
-            println!(" - {}", session_id);
-        }
-    }
-}
-
 // map user_id to list of session_ids
 pub struct UserSessionIdMap(pub Arc<Mutex<HashMap<i32, Arc<Mutex<Vec<Uuid>>>>>>);
 pub fn new_user_sessionid_map() -> UserSessionIdMap {
@@ -263,30 +234,42 @@ pub enum WebSocketEvent {
     ServerCreated(ServerCreated),
 }
 
-#[derive(Serialize, Deserialize)]
+// call signaling, client -> server
+#[derive(Deserialize, Debug, PartialEq)]
 #[serde(tag = "event_type", content = "data")]
-pub enum WebRTCWebSocketEvent {
-    Offer {
+pub enum CallClientEvent {
+    JoinCall { channel_id: i32 },
+    LeaveCall,
+    SfuAnswer { sdp: String },
+    SfuCandidate(IceCandidate),
+}
+
+// call signaling, server -> client
+#[derive(Serialize)]
+#[serde(tag = "event_type", content = "data")]
+pub enum CallServerEvent {
+    SfuOffer {
         sdp: String,
-        to: i32,
-        from: i32,
     },
-    Answer {
-        sdp: String,
-        to: i32,
-        from: i32,
+    SfuCandidate(IceCandidate),
+    CallParticipants {
+        channel_id: i32,
+        participants: Vec<CallParticipant>,
     },
-    IceCandidate {
-        candidate: String,
-        sdp_mid: Option<String>,      // `sdpMid` from the ICE candidate
-        sdp_mline_index: Option<u32>, // `sdpMLineIndex` from the ICE candidate
-        to: i32,
-        from: i32,
-    },
-    EndCall {
-        to: i32,
-        from: i32,
-    },
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct IceCandidate {
+    pub candidate: String,
+    pub sdp_mid: Option<String>,
+    pub sdp_mline_index: Option<u16>,
+}
+
+#[derive(Serialize)]
+pub struct CallParticipant {
+    pub user_id: i32,
+    // msid of this participant's tracks, so clients can label remote streams
+    pub stream_id: String,
 }
 
 #[derive(Serialize)]
@@ -301,16 +284,3 @@ pub struct ServerCreated {
     pub channel: Channel,
     pub users: Vec<User>,
 }
-
-// #[derive(Deserialize)]
-// pub struct ChatWSInput {
-//     pub user_id: i32,
-//     pub channel_id: i32,
-// }
-
-// #[derive(Deserialize)]
-// pub struct UpdateChannelInput {
-//     pub user_id: i32,
-//     pub prev_channel_id: i32,
-//     pub new_channel_id: i32,
-// }

@@ -1,18 +1,18 @@
 use crate::database::HarmonyDb;
-use crate::models::print_server_sessionid_map;
+use crate::middleware::protect_route::JwtGuard;
+use crate::models::CallClientEvent;
 use crate::models::ErrorResponse;
 use crate::models::Server;
 use crate::models::ServerType;
 use crate::models::UserSessionIdMap;
-use crate::models::WebRTCWebSocketEvent;
-use crate::models::WebSocketEvent;
 use crate::models::{ServerSessionIdMap, SessionIdWebsocketMap};
-use crate::utils::broadcast_ws_message::broadcast_to_user;
+use crate::sfu::Sfu;
 use crate::utils::json_error::json_error;
 use rocket::http::Status;
 use rocket::serde::json::Json;
+use rocket::State;
 use rocket::{futures::StreamExt, get};
-use rocket_db_pools::Connection;
+use sqlx::PgPool;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use uuid::Uuid;
@@ -20,31 +20,46 @@ use ws::{Channel, WebSocket};
 
 // the name channel_id is referring to the channels in my servers, not the rocket channel
 #[get("/chat_ws/<user_id>")]
+#[allow(clippy::too_many_arguments)]
 pub async fn websocket_handler(
     ws: WebSocket,
     user_id: i32,
-    websocket_map_state: &rocket::State<SessionIdWebsocketMap>,
-    server_map_state: &rocket::State<ServerSessionIdMap>,
-    user_map_state: &rocket::State<UserSessionIdMap>,
-    mut db: Connection<HarmonyDb>,
-) -> Channel<'static> {
+    guard: JwtGuard,
+    websocket_map_state: &State<SessionIdWebsocketMap>,
+    server_map_state: &State<ServerSessionIdMap>,
+    user_map_state: &State<UserSessionIdMap>,
+    sfu: &State<Arc<Sfu>>,
+    db: &State<HarmonyDb>,
+) -> Result<Channel<'static>, Status> {
+    if guard.0.sub != user_id {
+        return Err(Status::Forbidden);
+    }
     let session_id = Uuid::new_v4();
     let websocket_map = websocket_map_state.inner().clone();
     let server_map = server_map_state.0.clone();
     let user_map = user_map_state.0.clone();
-    let servers = get_all_servers(user_id, &mut db).await.unwrap();
+    let sfu = Arc::clone(sfu);
+    let pool = PgPool::clone(db);
+    let servers = get_all_servers(user_id, &pool)
+        .await
+        .map_err(|_| Status::InternalServerError)?;
 
-    ws.channel(move |stream| {
+    // inbound messages are only call signaling; an SDP answer is a few KiB
+    let limit = Some(256 << 10);
+    let ws = ws.config(ws::Config {
+        max_message_size: limit,
+        max_frame_size: limit,
+        ..Default::default()
+    });
+    Ok(ws.channel(move |stream| {
         let (sender, mut receiver) = stream.split();
         let sender = Arc::new(Mutex::new(sender));
 
         Box::pin(async move {
-            println!("User connected");
-
             // map session_id to websocket sender
             {
                 let mut websocket_map = websocket_map.lock().await;
-                websocket_map.insert(session_id, sender);
+                websocket_map.insert(session_id, Arc::clone(&sender));
             }
             // add the websocket sender to every server the user is in
             {
@@ -67,106 +82,44 @@ pub async fn websocket_handler(
                 vec.push(session_id);
             }
 
-            // TODO:  what the sigma is this for?
-            // Process incoming messages
+            // incoming messages are call signaling
             tokio::spawn(async move {
                 while let Some(message) = receiver.next().await {
-                    println!("rat");
-                    match message {
-                        Ok(msg) => {
-                            if let Ok(ws_msg) =
-                                serde_json::from_str::<WebRTCWebSocketEvent>(&msg.to_string())
-                            {
-                                match ws_msg {
-                                    WebRTCWebSocketEvent::Offer { sdp, to, from } => {
-                                        // Forward SDP offer to the recipient
-                                        let offer =
-                                            serde_json::to_string(&WebRTCWebSocketEvent::Offer {
-                                                sdp,
-                                                to,
-                                                from,
-                                            })
-                                            .unwrap();
-                                        broadcast_to_user(
-                                            &offer,
-                                            to,
-                                            websocket_map.clone(),
-                                            UserSessionIdMap(user_map.clone()),
-                                        )
-                                        .await;
-                                    }
-                                    WebRTCWebSocketEvent::Answer { sdp, to, from } => {
-                                        println!("received answer, sending");
-                                        // Forward SDP answer to the caller
-                                        let answer =
-                                            serde_json::to_string(&WebRTCWebSocketEvent::Answer {
-                                                sdp,
-                                                to,
-                                                from,
-                                            })
-                                            .unwrap();
-                                        broadcast_to_user(
-                                            &answer,
-                                            to,
-                                            websocket_map.clone(),
-                                            UserSessionIdMap(user_map.clone()),
-                                        )
-                                        .await;
-                                    }
-                                    WebRTCWebSocketEvent::IceCandidate {
-                                        candidate,
-                                        sdp_mid,
-                                        sdp_mline_index,
-                                        to,
-                                        from,
-                                    } => {
-                                        // Forward ICE candidate to the peer
-                                        let ice_msg = serde_json::to_string(
-                                            &WebRTCWebSocketEvent::IceCandidate {
-                                                candidate,
-                                                sdp_mid,
-                                                sdp_mline_index,
-                                                to,
-                                                from,
-                                            },
-                                        )
-                                        .unwrap();
-                                        broadcast_to_user(
-                                            &ice_msg,
-                                            to,
-                                            websocket_map.clone(),
-                                            UserSessionIdMap(user_map.clone()),
-                                        )
-                                        .await;
-                                    }
-                                    WebRTCWebSocketEvent::EndCall { to, from } => {
-                                        let end_call_msg =
-                                            serde_json::to_string(&WebRTCWebSocketEvent::EndCall {
-                                                to,
-                                                from,
-                                            })
-                                            .unwrap();
-
-                                        broadcast_to_user(
-                                            &end_call_msg,
-                                            to,
-                                            websocket_map.clone(),
-                                            UserSessionIdMap(user_map.clone()),
-                                        )
-                                        .await;
-                                    }
-                                }
-                            }
-                        }
+                    let text = match message {
+                        Ok(ws::Message::Text(text)) => text,
+                        Ok(_) => continue,
                         Err(e) => {
                             println!("Error in channel {:?}", e);
+                            break;
                         }
+                    };
+                    let Ok(event) = serde_json::from_str::<CallClientEvent>(&text) else {
+                        continue;
+                    };
+                    let result = match event {
+                        CallClientEvent::JoinCall { channel_id } => {
+                            if can_join(&pool, user_id, channel_id).await {
+                                sfu.join(session_id, user_id, channel_id, Arc::clone(&sender))
+                                    .await
+                            } else {
+                                println!("user {user_id} denied call in channel {channel_id}");
+                                Ok(())
+                            }
+                        }
+                        CallClientEvent::LeaveCall => {
+                            sfu.leave(session_id, None).await;
+                            Ok(())
+                        }
+                        CallClientEvent::SfuAnswer { sdp } => sfu.answer(session_id, sdp).await,
+                        CallClientEvent::SfuCandidate(c) => sfu.candidate(session_id, c).await,
+                    };
+                    if let Err(e) = result {
+                        eprintln!("call signaling error: {e}");
                     }
                 }
 
                 // Handle disconnection
-                println!("User disconnected");
-                // print_server_sessionid_map(server_map_state.clone()).await;
+                sfu.leave(session_id, None).await;
                 // Remove session_id from websocket map
                 {
                     let mut websocket_map = websocket_map.lock().await;
@@ -207,13 +160,25 @@ pub async fn websocket_handler(
                         }
                     }
                 }
-                // println!("\n\n");
-                // print_server_sessionid_map(server_map_state.clone()).await;
             });
 
             Ok(())
         })
-    })
+    }))
+}
+
+// user is a member of the server that owns the channel
+async fn can_join(pool: &PgPool, user_id: i32, channel_id: i32) -> bool {
+    sqlx::query_scalar::<_, i32>(
+        "SELECT 1 FROM channels c
+        JOIN users_servers us ON us.server_id = c.server_id
+        WHERE c.channel_id = $1 AND us.user_id = $2",
+    )
+    .bind(channel_id)
+    .bind(user_id)
+    .fetch_optional(pool)
+    .await
+    .is_ok_and(|row| row.is_some())
 }
 
 // add user_id's session_ids to the server websocket map
@@ -249,7 +214,7 @@ pub async fn add_user_to_server_map(
 // todo: move this somewhere else
 async fn get_all_servers(
     user_id: i32,
-    db: &mut Connection<HarmonyDb>,
+    pool: &PgPool,
 ) -> Result<Vec<Server>, (Status, Json<ErrorResponse>)> {
     let servers = sqlx::query_as!(
         Server,
@@ -260,35 +225,54 @@ async fn get_all_servers(
         WHERE us.user_id = $1"#,
         user_id,
     )
-    .fetch_all(&mut ***db)
+    .fetch_all(pool)
     .await
     .map_err(|_| (Status::BadRequest, json_error("Database error")))?;
 
     Ok(servers)
 }
 
-// pub async fn print_stream_map(stream_map: &rocket::State<UserStreamMap>) {
-//     // Lock the Mutex to access the HashMap
-//     let channels = stream_map.lock().await;
+#[cfg(test)]
+mod tests {
+    use crate::models::{CallClientEvent, IceCandidate};
 
-//     // Check if the HashMap is empty
-//     if channels.is_empty() {
-//         println!("The StreamMap is empty.");
-//         return;
-//     }
+    fn parse(json: &str) -> Option<CallClientEvent> {
+        serde_json::from_str(json).ok()
+    }
 
-//     // Iterate through the HashMap and print each entry
-//     for (channel_id, streams) in channels.iter() {
-//         println!("Channel ID: {}", channel_id);
-//         println!("Number of connected streams: {}", streams.len());
-
-//         // Optionally print details of each stream
-//         for (index, _stream) in streams.iter().enumerate() {
-//             // Streams are DuplexStream, which are not directly printable
-//             println!(
-//                 "  Stream {}: (details are not directly printable)",
-//                 index + 1
-//             );
-//         }
-//     }
-// }
+    #[test]
+    fn parses_call_events() {
+        assert_eq!(
+            parse(r#"{"event_type":"JoinCall","data":{"channel_id":7}}"#),
+            Some(CallClientEvent::JoinCall { channel_id: 7 })
+        );
+        assert_eq!(
+            parse(r#"{"event_type":"LeaveCall"}"#),
+            Some(CallClientEvent::LeaveCall)
+        );
+        assert_eq!(
+            parse(r#"{"event_type":"SfuAnswer","data":{"sdp":"v=0"}}"#),
+            Some(CallClientEvent::SfuAnswer { sdp: "v=0".into() })
+        );
+        assert_eq!(
+            parse(
+                r#"{"event_type":"SfuCandidate","data":{"candidate":"c","sdp_mid":"0","sdp_mline_index":0}}"#
+            ),
+            Some(CallClientEvent::SfuCandidate(IceCandidate {
+                candidate: "c".into(),
+                sdp_mid: Some("0".into()),
+                sdp_mline_index: Some(0),
+            }))
+        );
+        // old p2p events and garbage are rejected
+        assert_eq!(
+            parse(r#"{"event_type":"Offer","data":{"sdp":"x","to":1,"from":2}}"#),
+            None
+        );
+        assert_eq!(
+            parse(r#"{"event_type":"JoinCall","data":{"channel_id":"7"}}"#),
+            None
+        );
+        assert_eq!(parse("not json"), None);
+    }
+}
