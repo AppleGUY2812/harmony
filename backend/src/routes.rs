@@ -1,5 +1,6 @@
 use crate::controllers::{self};
 
+use rocket::data::{Limits, ToByteUnit};
 use rocket::{Build, Rocket};
 
 pub fn build() -> Rocket<Build> {
@@ -9,7 +10,11 @@ pub fn build() -> Rocket<Build> {
         .unwrap();
 
     rocket::build()
-        .configure(rocket::Config::figment().merge(("port", port)))
+        .configure(rocket::Config::figment().merge(("port", port)).merge((
+            "limits",
+            // 10 MiB icon (capped in S3File) plus multipart overhead
+            Limits::default().limit("data-form", 11.mebibytes()),
+        )))
         .mount(
             "/api/auth",
             routes![
@@ -47,18 +52,9 @@ pub fn build() -> Rocket<Build> {
             ],
         )
         .mount("/api/users", routes![controllers::users_routes::edit_user])
+        .mount(
+            "/api/images",
+            routes![controllers::image_routes::get_signature],
+        )
         .mount("/ws", routes![controllers::websockets::websocket_handler])
-    // .mount(
-    //     "/api/channels",
-    //     routes![controllers::channel_routes::get_channels],
-    // )
 }
-
-// .mount(
-//     "/api/messages",
-//     routes![
-//         controllers::message_routes::signup,
-//         controllers::auth_routes::login,
-//         controllers::auth_routes::logout
-//     ],
-// )

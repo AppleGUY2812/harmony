@@ -1,8 +1,8 @@
 import PropTypes from "prop-types";
 import { usePopupContext } from "../popups/PopupContext";
 import useServerStore from "../../zustand/useServerStore";
-import { useMemo } from "react";
 import { useAuthContext } from "../../context/AuthContext";
+import CloudFrontImage from "../../utils/CloudFrontImage";
 
 const UnreadConversation = ({ conversation, handleClick }) => {
   const { handleServerHover } = usePopupContext();
@@ -43,10 +43,11 @@ const UnreadConversation = ({ conversation, handleClick }) => {
           }`}
         >
           {otherUser.s3_icon_key ? (
-            <img
-              draggable={false}
+            <CloudFrontImage
               className="h-[48px] w-[48px]"
-              src={`https://${import.meta.env.VITE_CLOUDFRONT_IMAGE_URL}/user-icons/${otherUser.s3_icon_key}`}
+              folder="user-icons"
+              iconKey={otherUser.s3_icon_key}
+              thumb
             />
           ) : (
             <img
@@ -73,15 +74,6 @@ const UnreadConversation = ({ conversation, handleClick }) => {
             : "1K+"}
         </div>
       </div>
-      {/* <div
-        className={`overflow-hidden ${
-          selectedServer?.server_id === server.server_id
-            ? "rounded-[1.2rem] bg-primary"
-            : "rounded-md bg-base-100"
-        } transition-all duration-100 hover:bg-primary group-hover:cursor-pointer group-hover:rounded-[1.2rem] group-active:translate-y-[1.5px]`}
-      >
-        
-      </div> */}
     </div>
   );
 };

@@ -2,6 +2,7 @@ import PropTypes from "prop-types";
 import { usePopupContext } from "../popups/PopupContext";
 import useServerStore from "../../zustand/useServerStore";
 import { useMemo } from "react";
+import CloudFrontImage from "../../utils/CloudFrontImage";
 
 const Server = ({ server, handleClick }) => {
   const { handleServerHover } = usePopupContext();
@@ -46,10 +47,11 @@ const Server = ({ server, handleClick }) => {
           }`}
         >
           {server.s3_icon_key ? (
-            <img
-              draggable={false}
+            <CloudFrontImage
               className="h-[48px] w-[48px]"
-              src={`https://${import.meta.env.VITE_CLOUDFRONT_IMAGE_URL}/server-icons/${server.s3_icon_key}`}
+              folder="server-icons"
+              iconKey={server.s3_icon_key}
+              thumb
             />
           ) : (
             <div
@@ -81,15 +83,6 @@ const Server = ({ server, handleClick }) => {
           </>
         ) : null}
       </div>
-      {/* <div
-        className={`overflow-hidden ${
-          selectedServer?.server_id === server.server_id
-            ? "rounded-[1.2rem] bg-primary"
-            : "rounded-md bg-base-100"
-        } transition-all duration-100 hover:bg-primary group-hover:cursor-pointer group-hover:rounded-[1.2rem] group-active:translate-y-[1.5px]`}
-      >
-        
-      </div> */}
     </div>
   );
 };
@@ -107,29 +100,3 @@ Server.propTypes = {
 };
 
 export default Server;
-
-// import { useState } from "react";
-// const Server = () => {
-//   const [isHovered, setIsHovered] = useState(false);
-//   return (
-//     <div
-//       className="relative mb-2 h-[48px] w-[48px]"
-//       onMouseEnter={() => setIsHovered(true)}
-//       onMouseLeave={() => setIsHovered(false)}
-//     >
-//       <div className="avatar">
-//         <div className="rounded-md object-contain">
-//           <img src="https://img.daisyui.com/images/stock/photo-1534528741775-53994a69daeb.webp" />
-//         </div>
-//       </div>
-//       {isHovered && (
-//         <div className="absolute bottom-full left-1/2 z-50 bg-black">
-//           Server Name
-//         </div>
-//       )}
-
-//     </div>
-//   );
-// };
-
-// export default Server;

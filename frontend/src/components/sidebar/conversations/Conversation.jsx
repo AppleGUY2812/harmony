@@ -1,16 +1,12 @@
 import PropTypes from "prop-types";
 import useServerStore from "../../../zustand/useServerStore";
 import { useAuthContext } from "../../../context/AuthContext";
+import CloudFrontImage from "../../../utils/CloudFrontImage";
 
 // conversation is a Server that is type DM or GroupChat, and they have only 1 channel
 const Conversation = ({ handleClick, conversation }) => {
-  const { server, channel, users } = conversation;
+  const { server, users } = conversation;
 
-  // const setSelectedConversation = useServer(
-  //   (state) => state.setSelectedConversation,
-  // );
-  // const setSelectedServer = useServer((state) => state.setSelectedServer);
-  // const setSelectedChannel = useServer((state) => state.setSelectedChannel);
   const selectedServer = useServerStore((state) => state.selectedServer);
 
   const serverId = server.server_id;
@@ -21,19 +17,7 @@ const Conversation = ({ handleClick, conversation }) => {
   const otherUsers = users.filter((user) => user.user_id !== user_id);
   // handle only dm's rn, handle groupchats later
   const otherUser = otherUsers[0];
-  // const conversationName = otherUsers
-  //   .map((user) => user.display_username)
-  //   .join(", ");
 
-  // const handleClick = () => {
-  //   setSelectedConversation(conversation);
-  //   setSelectedServer(server);
-  //   // rename channel_name with the other user
-  //   // also dms and groupchats only have 1 channel
-  //   setSelectedChannel(channel);
-  // };
-
-  // temporary hard coded profile picture
   return (
     <div
       onClick={() => handleClick(conversation)}
@@ -41,10 +25,11 @@ const Conversation = ({ handleClick, conversation }) => {
     >
       <div className="h-10 w-10 overflow-hidden rounded-md bg-primary">
         {otherUser.s3_icon_key ? (
-          <img
-            draggable={false}
+          <CloudFrontImage
             className="h-10 w-10"
-            src={`https://${import.meta.env.VITE_CLOUDFRONT_IMAGE_URL}/user-icons/${otherUser.s3_icon_key}`}
+            folder="user-icons"
+            iconKey={otherUser.s3_icon_key}
+            thumb
           />
         ) : (
           <img

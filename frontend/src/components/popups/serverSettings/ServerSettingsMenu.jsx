@@ -1,17 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { TbBrandAmongUs } from "react-icons/tb";
 import { CSSTransition } from "react-transition-group";
 import { IoIosClose } from "react-icons/io";
 import PropTypes from "prop-types";
 import { usePopupContext } from "../PopupContext";
-import useCreateChannel from "../../../hooks/useCreateChannel";
 import useServerStore from "../../../zustand/useServerStore";
 
 import toast from "react-hot-toast";
 import useEditServer from "../../../hooks/useEditServer";
+import useImageUpload from "../../../utils/useImageUpload";
+import CloudFrontImage from "../../../utils/CloudFrontImage";
 const ServerSettingsMenu = () => {
   const menuRef = useRef(null);
-  const inputRef = useRef(null);
   const selectedServer = useServerStore((state) => state.selectedServer);
   const setSelectedServer = useServerStore((state) => state.setSelectedServer);
   const servers = useServerStore((state) => state.servers);
@@ -24,12 +23,17 @@ const ServerSettingsMenu = () => {
   } = usePopupContext();
 
   const [serverName, setServerName] = useState("");
-  const [serverIcon, setServerIcon] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState(null);
+  const {
+    icon: serverIcon,
+    setIcon: setServerIcon,
+    previewUrl,
+    setPreviewUrl,
+    handleFileChange: pickIcon,
+  } = useImageUpload();
 
   const [infoChanged, setInfoChanged] = useState(false);
 
-  const { loading, editServer } = useEditServer();
+  const { editServer } = useEditServer();
 
   const onClose = useCallback(() => {
     setServerSettingsMenuVisible(false);
@@ -71,70 +75,12 @@ const ServerSettingsMenu = () => {
     selectedServer?.server_name,
   ]);
 
-  const handleFileChange = useCallback((event) => {
-    const file = event.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const result = event.target?.result;
-        if (typeof result === "string") {
-          const img = new Image();
-          img.src = result;
-
-          img.onload = () => {
-            const inputWidth = img.naturalWidth;
-            const inputHeight = img.naturalHeight;
-            // convert to aspect ratio 1
-            let outputWidth = inputWidth;
-            let outputHeight = inputHeight;
-            if (inputWidth > inputHeight) {
-              outputWidth = inputHeight;
-            } else if (inputHeight > inputWidth) {
-              outputHeight = inputWidth;
-            }
-
-            const offsetX = (outputWidth - inputWidth) * 0.5;
-            const offsetY = (outputHeight - inputHeight) * 0.5;
-
-            const canvas = document.createElement("canvas");
-            canvas.width = outputWidth;
-            canvas.height = outputHeight;
-
-            const ctx = canvas.getContext("2d");
-            ctx.drawImage(img, offsetX, offsetY);
-
-            // create a second canvas to scale the square image to 512x512
-            const scaledCanvas = document.createElement("canvas");
-            scaledCanvas.width = 512;
-            scaledCanvas.height = 512;
-
-            const scaledCtx = scaledCanvas.getContext("2d");
-            scaledCtx.drawImage(canvas, 0, 0, 512, 512);
-
-            scaledCanvas.toBlob(
-              (blob) => {
-                const resizedImage = new File(
-                  [blob],
-                  "resized-server-icon.webp",
-                  {
-                    type: "image/webp",
-                  },
-                );
-                setServerIcon(resizedImage);
-                setPreviewUrl(URL.createObjectURL(blob));
-              },
-              "image/webp",
-              1, // Quality maximum (1)
-            );
-          };
-        } else {
-          console.error("Result of FileReader is not a string");
-        }
-      };
-      reader.readAsDataURL(file);
-      setInfoChanged(true);
-    }
-  }, []);
+  const handleFileChange = useCallback(
+    (event) => {
+      if (pickIcon(event)) setInfoChanged(true);
+    },
+    [pickIcon],
+  );
 
   const submit = async () => {
     if (!infoChanged || !serverName || serverName.length > 30) {
@@ -211,15 +157,17 @@ const ServerSettingsMenu = () => {
 
               <div className="mb-4 flex gap-5">
                 <div className="group relative h-[144px] w-[144px] overflow-hidden rounded-md bg-cyan-700">
-                  {selectedServer?.s3_icon_key || previewUrl ? (
+                  {previewUrl ? (
                     <img
                       draggable={false}
+                      className="h-[144px] w-[144px] object-cover"
+                      src={previewUrl}
+                    />
+                  ) : selectedServer?.s3_icon_key ? (
+                    <CloudFrontImage
                       className="h-[144px] w-[144px]"
-                      src={
-                        previewUrl
-                          ? previewUrl
-                          : `https://${import.meta.env.VITE_CLOUDFRONT_IMAGE_URL}/server-icons/${selectedServer?.s3_icon_key}`
-                      }
+                      folder="server-icons"
+                      iconKey={selectedServer.s3_icon_key}
                     />
                   ) : (
                     <div

@@ -1,6 +1,7 @@
 import { useAuthContext } from "../../context/AuthContext.jsx";
 import { usePopupContext } from "../popups/PopupContext.jsx";
 import LogoutButton from "./LogoutButton.jsx";
+import CloudFrontImage from "../../utils/CloudFrontImage.jsx";
 const Profilebar = () => {
   const { setUserMenu, setModalOverlayVisible } = usePopupContext();
   const { authUser } = useAuthContext();
@@ -18,10 +19,11 @@ const Profilebar = () => {
       >
         <div className="group relative h-10 w-10 overflow-hidden rounded-md bg-primary">
           {authUser.s3_icon_key ? (
-            <img
-              draggable={false}
+            <CloudFrontImage
               className="h-10 w-10"
-              src={`https://${import.meta.env.VITE_CLOUDFRONT_IMAGE_URL}/user-icons/${authUser.s3_icon_key}`}
+              folder="user-icons"
+              iconKey={authUser.s3_icon_key}
+              thumb
             />
           ) : (
             <img

@@ -5,15 +5,13 @@ use crate::models::{
     ServerWithUnreadMessages, SessionIdWebsocketMap, User, UserJoin, UserSessionIdMap,
     WebSocketEvent,
 };
-use crate::utils::aws_s3_utils::{remove_from_s3, upload_to_s3};
+use crate::utils::aws_s3_utils::{remove_icon, upload_icon, Storage};
 use crate::utils::broadcast_ws_message::{broadcast_to_server, broadcast_to_users};
 use crate::utils::json_error::json_error;
 use crate::{
     database,
     models::{self, ErrorResponse},
 };
-use aws_sdk_s3::primitives::ByteStream;
-use aws_sdk_s3::Client;
 use rocket::form::Form;
 use rocket::http::Status;
 use rocket::serde::json::Json;
@@ -303,76 +301,12 @@ pub async fn join_server(
     Ok::<_, (Status, Json<ErrorResponse>)>(Json(server))
 }
 
-// WARNING, does not check for duplicate DM's with the same person
-// #[post("/create", format = "json", data = "<server>")]
-// pub async fn create_server(
-//     guard: JwtGuard,
-//     server: Json<models::CreateServerInput>,
-//     mut db: Connection<database::HarmonyDb>,
-// ) -> Result<Json<Server>, (Status, Json<ErrorResponse>)> {
-//     server
-//         .validate()
-//         .map_err(|_| (Status::BadRequest, json_error("Failed JSON validation")))?;
-
-//     let server_type: ServerType = server.server_type;
-//     let recipient_ids: &Vec<i32> = &server.recipient_ids;
-//     let server_name: &String = &server.server_name;
-//     let user_id: &i32 = &guard.0.sub;
-
-//     // validate num recipients given server type
-//     let recipients_len = recipient_ids.len();
-//     match server_type {
-//         ServerType::Server => {
-//             if recipients_len != 0 {
-//                 return Err((
-//                     Status::BadRequest,
-//                     json_error("Server type server should not have recipients on creation"),
-//                 ));
-//             };
-//         }
-//         ServerType::Dm => {
-//             if recipients_len != 1 {
-//                 return Err((
-//                     Status::BadRequest,
-//                     json_error("Server type dm should have 1 recipient"),
-//                 ));
-//             };
-//             if recipient_ids[0] == *user_id {
-//                 return Err((
-//                     Status::BadRequest,
-//                     json_error("Can not create DM with yourself"),
-//                 ));
-//             }
-//         }
-//         ServerType::GroupChat => {
-//             if recipients_len < 2 {
-//                 return Err((
-//                     Status::BadRequest,
-//                     json_error("Server type groupchat should have at least 2 recipients"),
-//                 ));
-//             };
-//         }
-//     };
-
-//     // make server
-//     let server = create_server_helper(server_type, server_name, *user_id, &mut db).await?;
-//     let server_id: i32 = server.server_id;
-//     // make sender join server
-//     join_server_helper(*user_id, server_id, &mut db).await?;
-//     // make recipients join server
-//     for recipient in recipient_ids.iter() {
-//         join_server_helper(*recipient, server_id, &mut db).await?;
-//     }
-
-//     Ok(Json(server))
-// }
-
 // returns server and default channel
 #[post("/create", data = "<server_input>")]
 pub async fn create_server(
     guard: JwtGuard,
     server_input: Form<CreateServerInput>,
-    aws_client: &State<Client>,
+    aws_client: &State<Storage>,
     mut db: Connection<database::HarmonyDb>,
     websocket_map_state: &rocket::State<SessionIdWebsocketMap>,
     server_map_state: &rocket::State<ServerSessionIdMap>,
@@ -427,14 +361,13 @@ pub async fn create_server(
 
     // put server icon into S3 bucket, if server_icon provided
     if let Some(server_icon) = &server_input.server_icon {
-        upload_to_s3(
+        upload_icon(
             aws_client,
             "server-icons",
             &server_icon.key,
-            ByteStream::from(server_icon.data.value.clone()),
+            server_icon.data.value.clone(),
         )
-        .await
-        .map_err(|_| (Status::BadRequest, json_error("Server picture S3 failed")))?;
+        .await?;
     }
 
     // make server
@@ -488,7 +421,7 @@ pub async fn edit_server(
     guard: JwtGuard,
     server_id: i32,
     server_input: Form<EditServerInput>,
-    aws_client: &State<Client>,
+    aws_client: &State<Storage>,
     mut db: Connection<database::HarmonyDb>,
 ) -> Result<Json<Server>, (Status, Json<ErrorResponse>)> {
     server_input
@@ -503,14 +436,13 @@ pub async fn edit_server(
 
     // change server_icon if provided
     if let Some(server_icon) = server_icon {
-        upload_to_s3(
+        upload_icon(
             aws_client,
             "server-icons",
             &server_icon.key,
-            ByteStream::from(server_icon.data.value.clone()),
+            server_icon.data.value.clone(),
         )
-        .await
-        .map_err(|_| (Status::BadRequest, json_error("Server picture S3 failed")))?;
+        .await?;
 
         let old_icon_key = sqlx::query_scalar!(
             "SELECT s3_icon_key FROM servers WHERE server_id = $1",
@@ -527,7 +459,7 @@ pub async fn edit_server(
 
         // if there was a previous icon, remove it from s3
         if let Some(old_icon_key) = old_icon_key {
-            remove_from_s3(aws_client, "server-icons", &old_icon_key)
+            remove_icon(aws_client, "server-icons", &old_icon_key)
                 .await
                 .map_err(|_| {
                     (
@@ -798,14 +730,8 @@ pub async fn get_channels_list(
     server_ids_json: Json<ServerIds>,
     mut db: Connection<database::HarmonyDb>,
 ) -> Result<Json<Vec<Vec<Channel>>>, (Status, Json<ErrorResponse>)> {
-    // let user_id = &guard.0.sub;
-
     let mut channels_list: Vec<Vec<Channel>> = Vec::new();
     for server_id in server_ids_json.server_ids.iter() {
-        // let server_checker = ByServer {
-        //     server_id: *server_id,
-        // };
-        // server_checker.user_in_server(&mut db, *user_id).await?;
         let channels = get_channels_helper(*server_id, &mut db).await?;
         channels_list.push(channels);
     }

@@ -8,15 +8,26 @@ services:
       RUST_ENV: "production"
       ROCKET_DATABASES: "{harmony_db={url=\"postgresql://postgres:${POSTGRES_PASSWORD}@db:5432\"}}"
       JWT_SECRET: "${JWT_SECRET}"
-      AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID}"
-      AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY}"
-      AWS_REGION: "${AWS_REGION}"
-      S3_IMAGE_BUCKET: "${S3_IMAGE_BUCKET}"
+      # AWS/CloudFront are optional: leave S3_IMAGE_BUCKET empty to store icons in UPLOAD_DIR
+      AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID:-}"
+      AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY:-}"
+      AWS_REGION: "${AWS_REGION:-}"
+      S3_IMAGE_BUCKET: "${S3_IMAGE_BUCKET:-}"
+      CLOUDFRONT_DOMAIN: "${CLOUDFRONT_DOMAIN:-}"
+      CLOUDFRONT_KEY_PAIR_ID: "${CLOUDFRONT_KEY_PAIR_ID:-}"
+      CLOUDFRONT_PRIVATE_KEY: "${CLOUDFRONT_PRIVATE_KEY:-}"
+      UPLOAD_DIR: "/uploads"
+      WEBRTC_UDP_PORT: "50000"
+      # public IP clients reach the SFU on (127.0.0.1 for local docker)
+      WEBRTC_PUBLIC_IP: "${WEBRTC_PUBLIC_IP}"
     build:
       context: ./backend
       dockerfile: Dockerfile
     ports:
       - "5500:5500"
+      - "50000:50000/udp"
+    volumes:
+      - uploads:/uploads
     depends_on:
       - db
   db:
@@ -54,4 +65,6 @@ services:
 
 volumes:
   db:
+    driver: local
+  uploads:
     driver: local

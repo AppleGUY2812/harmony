@@ -1,7 +1,7 @@
-use aws_sdk_s3::Client;
-// use middleware::cors;
 use models::{new_server_sessionid_map, new_sessionid_websocket_map, new_user_sessionid_map};
-use rocket::http::Method;
+use rocket::fairing::AdHoc;
+use rocket::fs::FileServer;
+use rocket::http::{ContentType, Header, Method, Status};
 use rocket_cors::{AllowedOrigins, CorsOptions};
 use rocket_db_pools::Database;
 use utils::error_catchers::not_authorized;
@@ -12,14 +12,11 @@ extern crate rocket;
 mod database;
 mod models;
 mod routes;
+mod sfu;
 
 mod controllers;
 mod middleware;
 mod utils;
-
-// #[derive(Database)]
-// #[database("harmony_db")]
-// struct HarmonyDb(sqlx::PgPool);
 
 #[get("/")]
 async fn index() -> &'static str {
@@ -51,22 +48,45 @@ async fn rocket() -> _ {
         .to_cors()
         .unwrap();
 
-    let config = aws_config::load_from_env().await;
-    let aws_client = Client::new(&config);
-    // let response = aws_client.list_buckets().send().await.unwrap();
-    // // Print the list of buckets
-    // println!("Buckets: {:?}", response.buckets);
+    let storage = utils::aws_s3_utils::Storage::from_env().await;
+    let upload_dir = match &storage {
+        utils::aws_s3_utils::Storage::Local(dir) => Some(dir.clone()),
+        utils::aws_s3_utils::Storage::S3 { .. } => None,
+    };
 
-    routes::build()
+    let rocket = routes::build()
         .attach(database::HarmonyDb::init())
-        // .attach(cors::Cors)
         .mount("/", rocket_cors::catch_all_options_routes())
         .attach(cors.clone())
         .manage(cors)
         .manage(websocket_map)
         .manage(server_map)
         .manage(user_map)
-        .manage(aws_client)
+        .manage(storage)
+        .manage(sfu::Sfu::from_env().await.expect("failed to start SFU"))
+        .manage(utils::cloudfront::CloudFrontSigner::from_env())
         .register("/", catchers![not_authorized])
-        .mount("/", routes![index])
+        .mount("/", routes![index]);
+
+    // No S3: serve uploaded icons from disk. Keys are unique per upload, so cache forever.
+    match upload_dir {
+        Some(dir) => {
+            std::fs::create_dir_all(&dir).expect("failed to create UPLOAD_DIR");
+            rocket
+                .mount("/images", FileServer::from(dir))
+                .attach(AdHoc::on_response("image cache", |req, res| {
+                    Box::pin(async move {
+                        if res.status() == Status::Ok && req.uri().path().starts_with("/images/") {
+                            res.set_header(Header::new(
+                                "Cache-Control",
+                                "public, max-age=31536000, immutable",
+                            ));
+                            // keys have no extension; every stored object is webp
+                            res.set_header(ContentType::new("image", "webp"));
+                        }
+                    })
+                }))
+        }
+        None => rocket,
+    }
 }

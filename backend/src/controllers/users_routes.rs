@@ -1,10 +1,8 @@
 use crate::database::HarmonyDb;
 use crate::middleware::protect_route::JwtGuard;
 use crate::models::{EditUserInput, ErrorResponse, User};
-use crate::utils::aws_s3_utils::{remove_from_s3, upload_to_s3};
+use crate::utils::aws_s3_utils::{remove_icon, upload_icon, Storage};
 use crate::utils::json_error::json_error;
-use aws_sdk_s3::primitives::ByteStream;
-use aws_sdk_s3::Client;
 use rocket::form::Form;
 use rocket::http::Status;
 use rocket::serde::json::Json;
@@ -18,7 +16,7 @@ use rocket_db_pools::Connection;
 pub async fn edit_user(
     guard: JwtGuard,
     user_input: Form<EditUserInput>,
-    aws_client: &State<Client>,
+    aws_client: &State<Storage>,
     mut db: Connection<HarmonyDb>,
 ) -> Result<Json<User>, (Status, Json<ErrorResponse>)> {
     let user_id = &guard.0.sub;
@@ -26,14 +24,13 @@ pub async fn edit_user(
 
     // change user icon if provided
     if let Some(user_icon) = user_icon {
-        upload_to_s3(
+        upload_icon(
             aws_client,
             "user-icons",
             &user_icon.key,
-            ByteStream::from(user_icon.data.value.clone()),
+            user_icon.data.value.clone(),
         )
-        .await
-        .map_err(|_| (Status::BadRequest, json_error("Server picture S3 failed")))?;
+        .await?;
 
         let old_icon_key =
             sqlx::query_scalar!("SELECT s3_icon_key FROM users WHERE user_id = $1", user_id)
@@ -65,7 +62,7 @@ pub async fn edit_user(
 
         // if there was a previous icon, remove it from s3
         if let Some(old_icon_key) = old_icon_key {
-            remove_from_s3(aws_client, "user-icons", &old_icon_key)
+            remove_icon(aws_client, "user-icons", &old_icon_key)
                 .await
                 .map_err(|_| {
                     (

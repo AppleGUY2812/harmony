@@ -2,6 +2,7 @@ import PropTypes from "prop-types";
 import useJoinServer from "../../hooks/useJoinServer";
 import useServerStore from "../../zustand/useServerStore";
 import { useMemo } from "react";
+import CloudFrontImage from "../../utils/CloudFrontImage";
 const ServerCard = ({ server }) => {
   const { loading, joinServer } = useJoinServer();
   const setSelectedServer = useServerStore((state) => state.setSelectedServer);
@@ -32,10 +33,10 @@ const ServerCard = ({ server }) => {
     >
       <div className="bg-primary">
         {server.s3_icon_key ? (
-          <img
-            draggable={false}
+          <CloudFrontImage
             className="h-48 w-48"
-            src={`https://${import.meta.env.VITE_CLOUDFRONT_IMAGE_URL}/server-icons/${server.s3_icon_key}`}
+            folder="server-icons"
+            iconKey={server.s3_icon_key}
           />
         ) : (
           <div

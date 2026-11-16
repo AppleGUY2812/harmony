@@ -10,6 +10,7 @@ import useGetDm from "../../../hooks/useGetDm";
 import useImageUpload from "../../../utils/useImageUpload";
 import toast from "react-hot-toast";
 import useEditUser from "../../../hooks/useEditUser";
+import CloudFrontImage from "../../../utils/CloudFrontImage";
 
 // TODO: Make a factory for this mess
 const UserMenu = () => {
@@ -138,7 +139,7 @@ const UserMenu = () => {
       <div className="absolute left-0 top-0 flex h-screen w-screen items-center justify-center">
         <form onSubmit={handleSubmit} ref={menuRef}>
           <fieldset disabled={buttonsDisabled}>
-            <div className="bg-base-500 w-[460px] rounded-md p-4">
+            <div className="w-[460px] rounded-md bg-base-500 p-4">
               <div className="flex justify-between">
                 <h1 className="text-2xl font-bold text-content-header">
                   {userMenu.user.display_username}
@@ -150,15 +151,17 @@ const UserMenu = () => {
 
               <div className="justify-apart flex justify-between">
                 <div className="group relative h-[144px] w-[144px] overflow-hidden rounded-md bg-primary">
-                  {userMenu.user?.s3_icon_key || previewUrl ? (
+                  {previewUrl ? (
                     <img
                       draggable={false}
+                      className="h-[144px] w-[144px] object-cover"
+                      src={previewUrl}
+                    />
+                  ) : userMenu.user?.s3_icon_key ? (
+                    <CloudFrontImage
                       className="h-[144px] w-[144px]"
-                      src={
-                        previewUrl
-                          ? previewUrl
-                          : `https://${import.meta.env.VITE_CLOUDFRONT_IMAGE_URL}/user-icons/${userMenu.user.s3_icon_key}`
-                      }
+                      folder="user-icons"
+                      iconKey={userMenu.user.s3_icon_key}
                     />
                   ) : (
                     <img
