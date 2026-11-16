@@ -1,0 +1,27 @@
+{
+	# phones connect by IP and send no SNI
+	default_sni {$DEMO_HOST}
+	# :80 below is the plain-http listener for the tunnel, not a redirect
+	auto_https disable_redirects
+}
+
+(app) {
+	@backend path /api/* /ws/* /images/*
+	handle @backend {
+		reverse_proxy backend:5500
+	}
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+https://{$DEMO_HOST} {
+	tls internal
+	import app
+}
+
+:80 {
+	import app
+}

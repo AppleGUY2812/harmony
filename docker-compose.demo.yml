@@ -1,0 +1,73 @@
+# Demo stack, started by ./demo.sh. Not for production (see docker-compose.yml).
+name: harmony-demo
+
+services:
+  db:
+    image: postgres:15.2-alpine
+    environment:
+      POSTGRES_PASSWORD: demo
+    volumes:
+      - db:/var/lib/postgresql/data
+      - ./backend/init-db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # -h localhost: initdb's temporary server is socket-only, so this waits for the real one
+      test: pg_isready -U postgres -h localhost
+      interval: 2s
+      retries: 30
+
+  backend:
+    build: ./backend
+    restart: on-failure
+    environment:
+      ROCKET_PORT: "5500"
+      ROCKET_ADDRESS: "0.0.0.0"
+      ROCKET_DATABASES: '{harmony_db={url="postgresql://postgres:demo@db:5432"}}'
+      JWT_SECRET: ${JWT_SECRET:-}
+      WEBRTC_UDP_PORT: "50000"
+      WEBRTC_PUBLIC_IP: ${WEBRTC_PUBLIC_IP:-}
+      UPLOAD_DIR: /uploads
+    ports:
+      # sfu.rs gives each call its own UDP port in 50000-50199
+      - "50000-50199:50000-50199/udp"
+    volumes:
+      - uploads:/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+
+  caddy:
+    build:
+      context: ./frontend
+      # empty VITE_* URLs: API, websocket and /images go to the page's own origin
+      dockerfile_inline: |
+        FROM node:18 AS build
+        WORKDIR /app
+        COPY package*.json ./
+        RUN npm ci
+        COPY . .
+        ENV VITE_API_URL="" VITE_CLOUDFRONT_IMAGE_URL=""
+        RUN npm run build
+        FROM caddy:2.8-alpine
+        COPY --from=build /app/dist /srv
+    environment:
+      DEMO_HOST: ${DEMO_HOST:-localhost}
+    ports:
+      - "443:443"
+    volumes:
+      - ./demo/Caddyfile:/etc/caddy/Caddyfile:ro
+      # keeps the internal CA, so the cert warning is accepted once per browser
+      - caddy_data:/data
+    depends_on:
+      - backend
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    profiles: [internet]
+    command: tunnel --no-autoupdate --url http://caddy:80
+    depends_on:
+      - caddy
+
+volumes:
+  db:
+  caddy_data:
+  uploads:
