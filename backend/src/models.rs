@@ -199,32 +199,6 @@ pub struct CreateChannelInput {
     #[validate(length(min = 1, max = 30))]
     pub channel_name: String,
 }
-// websocket stuff
-
-use rocket::futures::stream::SplitSink;
-use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::Mutex;
-use ws::{stream::DuplexStream, Message as WsMessage};
-
-// maps session_id to list of websocket send connections
-pub type SessionIdWebsocketMap =
-    Arc<Mutex<HashMap<Uuid, Arc<Mutex<SplitSink<DuplexStream, WsMessage>>>>>>;
-pub fn new_sessionid_websocket_map() -> SessionIdWebsocketMap {
-    Arc::new(Mutex::new(HashMap::new()))
-}
-
-// map server_id to list of session_ids
-pub struct ServerSessionIdMap(pub Arc<Mutex<HashMap<i32, Arc<Mutex<Vec<Uuid>>>>>>);
-pub fn new_server_sessionid_map() -> ServerSessionIdMap {
-    ServerSessionIdMap(Arc::new(Mutex::new(HashMap::new())))
-}
-// map user_id to list of session_ids
-pub struct UserSessionIdMap(pub Arc<Mutex<HashMap<i32, Arc<Mutex<Vec<Uuid>>>>>>);
-pub fn new_user_sessionid_map() -> UserSessionIdMap {
-    UserSessionIdMap(Arc::new(Mutex::new(HashMap::new())))
-}
-
 // websocket events
 #[derive(Serialize)]
 #[serde(tag = "event_type", content = "data")]

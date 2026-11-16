@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
+import { useWebsocketContext } from "../context/WebsocketContext";
 
 // conversation is a server, that has 1 channel, treated as both
 // returns server list, userslist (list of users in each server), and channelsList
@@ -10,6 +11,8 @@ const useConversationInfo = (serverType) => {
   const [loading, setLoading] = useState(false);
   // {server, channel, users}
   const [conversations, setConversations] = useState([]);
+  // refetch unread counts after a reconnect, without the spinner
+  const { epoch } = useWebsocketContext();
 
   const fetchServers = useCallback(async () => {
     try {
@@ -79,7 +82,7 @@ const useConversationInfo = (serverType) => {
 
   useEffect(() => {
     const fetchData = async () => {
-      setLoading(true);
+      setLoading(epoch === 0);
       const servers = await fetchServers();
       if (!servers) {
         setLoading(false);
@@ -104,7 +107,7 @@ const useConversationInfo = (serverType) => {
     };
 
     fetchData();
-  }, [fetchServers]);
+  }, [fetchServers, epoch]);
 
   return { loading, conversations };
 };

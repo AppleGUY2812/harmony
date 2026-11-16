@@ -1,12 +1,11 @@
 use crate::middleware::protect_route::JwtGuard;
 use crate::models::{
     Channel, CreateChannelInput, CreateServerInput, EditServerInput, OptionalServerChannel, Server,
-    ServerChannel, ServerCreated, ServerIds, ServerSessionIdMap, ServerType,
-    ServerWithUnreadMessages, SessionIdWebsocketMap, User, UserJoin, UserSessionIdMap,
+    ServerChannel, ServerCreated, ServerIds, ServerType, ServerWithUnreadMessages, User, UserJoin,
     WebSocketEvent,
 };
 use crate::utils::aws_s3_utils::{remove_icon, upload_icon, Storage};
-use crate::utils::broadcast_ws_message::{broadcast_to_server, broadcast_to_users};
+use crate::utils::hub::Hub;
 use crate::utils::json_error::json_error;
 use crate::{
     database,
@@ -17,9 +16,8 @@ use rocket::http::Status;
 use rocket::serde::json::Json;
 use rocket::State;
 use rocket_db_pools::Connection;
+use std::sync::Arc;
 use validator::Validate;
-
-use super::websockets::add_user_to_server_map;
 
 // get servers with server_type = sever for user for sidebar
 #[get("/get/<server_type>")]
@@ -229,9 +227,7 @@ pub async fn get_servers_popular(
 pub async fn join_server(
     guard: JwtGuard,
     server_id: i32,
-    websocket_map_state: &rocket::State<SessionIdWebsocketMap>,
-    server_map_state: &rocket::State<ServerSessionIdMap>,
-    user_map_state: &rocket::State<UserSessionIdMap>,
+    hub: &State<Arc<Hub>>,
     mut db: Connection<database::HarmonyDb>,
 ) -> Result<Json<models::Server>, (Status, Json<ErrorResponse>)> {
     let user_id = &guard.0.sub;
@@ -262,14 +258,7 @@ pub async fn join_server(
         return Err((Status::BadRequest, json_error("User already in server")));
     }
 
-    join_server_helper(
-        *user_id,
-        server_id,
-        &mut db,
-        server_map_state,
-        user_map_state,
-    )
-    .await?;
+    join_server_helper(*user_id, server_id, &mut db, hub).await?;
 
     // broadcast user info to people online in the server (to update message map)
     let user = sqlx::query_as!(
@@ -290,13 +279,7 @@ pub async fn join_server(
             json_error("serialization error"),
         )
     })?;
-    broadcast_to_server(
-        &user_json,
-        server_id,
-        websocket_map_state.inner().clone(),
-        ServerSessionIdMap(server_map_state.0.clone()),
-    )
-    .await;
+    hub.send_to_server(server_id, &user_json);
 
     Ok::<_, (Status, Json<ErrorResponse>)>(Json(server))
 }
@@ -308,9 +291,7 @@ pub async fn create_server(
     server_input: Form<CreateServerInput>,
     aws_client: &State<Storage>,
     mut db: Connection<database::HarmonyDb>,
-    websocket_map_state: &rocket::State<SessionIdWebsocketMap>,
-    server_map_state: &rocket::State<ServerSessionIdMap>,
-    user_map_state: &rocket::State<UserSessionIdMap>,
+    hub: &State<Arc<Hub>>,
 ) -> Result<Json<ServerChannel>, (Status, Json<ErrorResponse>)> {
     server_input
         .validate()
@@ -387,7 +368,7 @@ pub async fn create_server(
     combined_ids.push(*user_id);
 
     for id in combined_ids.iter() {
-        join_server_helper(*id, server_id, &mut db, server_map_state, user_map_state).await?;
+        join_server_helper(*id, server_id, &mut db, hub).await?;
     }
 
     // broadcast server created websocket event
@@ -405,13 +386,7 @@ pub async fn create_server(
     })?;
 
     // broadcast server created to recipients + sender
-    broadcast_to_users(
-        &message_json,
-        &combined_ids,
-        websocket_map_state.inner().clone(),
-        UserSessionIdMap(user_map_state.0.clone()),
-    )
-    .await;
+    hub.send_to_users(&combined_ids, &message_json);
 
     Ok(Json(ServerChannel { server, channel }))
 }
@@ -587,8 +562,7 @@ async fn join_server_helper(
     user_id: i32,
     server_id: i32,
     db: &mut Connection<database::HarmonyDb>,
-    server_map_state: &rocket::State<ServerSessionIdMap>,
-    user_map_state: &rocket::State<UserSessionIdMap>,
+    hub: &Hub,
 ) -> Result<(), (Status, Json<ErrorResponse>)> {
     // join server
     sqlx::query!(
@@ -618,8 +592,7 @@ async fn join_server_helper(
     .await
     .map_err(|_| (Status::InternalServerError, json_error("Database error")))?;
 
-    // add user_id's session_ids to the server websocket map
-    add_user_to_server_map(user_id, server_id, server_map_state, user_map_state).await;
+    hub.join_server(user_id, server_id);
 
     Ok(())
 }
@@ -628,6 +601,7 @@ async fn join_server_helper(
 pub async fn delete_server(
     guard: JwtGuard,
     server_id: i32,
+    hub: &State<Arc<Hub>>,
     mut db: Connection<database::HarmonyDb>,
 ) -> Result<(), (Status, Json<ErrorResponse>)> {
     let user_id = &guard.0.sub;
@@ -639,6 +613,7 @@ pub async fn delete_server(
         .execute(&mut **db)
         .await
         .map_err(|_| (Status::BadRequest, json_error("Database error")))?;
+    hub.remove_server(server_id);
 
     Ok(())
 }
@@ -673,6 +648,7 @@ async fn is_admin(
 pub async fn leave_server(
     guard: JwtGuard,
     server_id: i32,
+    hub: &State<Arc<Hub>>,
     mut db: Connection<database::HarmonyDb>,
 ) -> Result<(), (Status, Json<ErrorResponse>)> {
     let user_id = &guard.0.sub;
@@ -692,6 +668,7 @@ pub async fn leave_server(
             json_error("Database error. Does server_id exist?"),
         )
     })?;
+    hub.leave_server(*user_id, server_id);
 
     // decrement users
     sqlx::query!(

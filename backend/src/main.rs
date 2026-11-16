@@ -1,4 +1,3 @@
-use models::{new_server_sessionid_map, new_sessionid_websocket_map, new_user_sessionid_map};
 use rocket::fairing::AdHoc;
 use rocket::fs::FileServer;
 use rocket::http::{ContentType, Header, Method, Status};
@@ -26,9 +25,6 @@ async fn index() -> &'static str {
 #[launch]
 async fn rocket() -> _ {
     let _ = dotenv::dotenv().ok();
-    let websocket_map = new_sessionid_websocket_map();
-    let server_map = new_server_sessionid_map();
-    let user_map = new_user_sessionid_map();
 
     let cors = CorsOptions::default()
         .allowed_origins(AllowedOrigins::all())
@@ -59,9 +55,7 @@ async fn rocket() -> _ {
         .mount("/", rocket_cors::catch_all_options_routes())
         .attach(cors.clone())
         .manage(cors)
-        .manage(websocket_map)
-        .manage(server_map)
-        .manage(user_map)
+        .manage(std::sync::Arc::new(utils::hub::Hub::default()))
         .manage(storage)
         .manage(sfu::Sfu::from_env().await.expect("failed to start SFU"))
         .manage(utils::cloudfront::CloudFrontSigner::from_env())

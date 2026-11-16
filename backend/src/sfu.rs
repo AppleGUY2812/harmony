@@ -3,8 +3,7 @@
 // Same shape as Pion's sfu-ws example. The server always makes the offers.
 
 use crate::models::{CallParticipant, CallServerEvent, IceCandidate};
-use rocket::futures::stream::SplitSink;
-use rocket::futures::SinkExt;
+use crate::utils::hub::Hub;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
@@ -36,9 +35,6 @@ use webrtc::rtp_transceiver::{RTCPFeedback, RTCRtpTransceiverInit};
 use webrtc::track::track_local::track_local_static_rtp::TrackLocalStaticRTP;
 use webrtc::track::track_local::{TrackLocal, TrackLocalWriter};
 use webrtc::track::track_remote::TrackRemote;
-use ws::{stream::DuplexStream, Message as WsMessage};
-
-pub type WsSender = Arc<Mutex<SplitSink<DuplexStream, WsMessage>>>;
 
 const STUN_SERVER: &str = "stun:stun.l.google.com:19302";
 
@@ -153,7 +149,7 @@ impl Sfu {
         session: Uuid,
         user_id: i32,
         channel_id: i32,
-        ws: WsSender,
+        hub: Arc<Hub>,
     ) -> Result<(), webrtc::Error> {
         // one call per session
         self.leave(session, None).await;
@@ -186,8 +182,7 @@ impl Sfu {
         let (tx, mut rx) = mpsc::channel::<String>(64);
         tokio::spawn(async move {
             while let Some(json) = rx.recv().await {
-                if let Err(e) = ws.lock().await.send(json.into()).await {
-                    eprintln!("sfu: ws send: {e}");
+                if !hub.send_to_session(session, json) {
                     break;
                 }
             }

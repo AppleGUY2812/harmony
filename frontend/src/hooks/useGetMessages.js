@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import useServerStore from "../zustand/useServerStore";
 import toast from "react-hot-toast";
 import useUpdateLastReadMessage from "./useUpdateLastReadMessage";
+import { useWebsocketContext } from "../context/WebsocketContext";
 
 const PAGE_SIZE = 50;
 
@@ -45,6 +46,7 @@ const useGetMessages = () => {
     (state) => state.updateServerUnread,
   );
   const { UpdateLastReadMessage } = useUpdateLastReadMessage();
+  const { epoch } = useWebsocketContext();
   const { server_id, server_type } = selectedServer ?? {};
 
   useEffect(() => {
@@ -91,6 +93,41 @@ const useGetMessages = () => {
     updateConversationUnread,
     updateServerUnread,
   ]);
+
+  // after a reconnect, merge in whatever arrived while the socket was down
+  const resyncedEpoch = useRef(epoch);
+  useEffect(() => {
+    const channel_id = useServerStore.getState().selectedChannel?.channel_id;
+    if (epoch === resyncedEpoch.current || !channel_id) return;
+    resyncedEpoch.current = epoch;
+    const resync = async () => {
+      const page = await fetchPage(channel_id);
+      if (!page || !isOpen(channel_id)) return;
+      const { messages, selectedServer } = useServerStore.getState();
+      // the store can still hold the previous channel while this one loads
+      const mine = messages.filter((m) => m.channel_id === channel_id);
+      const sent = mine.filter((m) => m.message_id);
+      const pending = mine.filter((m) => !m.message_id);
+      const seen = new Set(sent.map((m) => m.message_id));
+      const fresh = page.filter((m) => !seen.has(m.message_id));
+      if (!fresh.length) return;
+
+      if (fresh.length === PAGE_SIZE) {
+        // missed more than a page: no overlap to stitch onto, start from the newest page
+        setMessages([...page, ...pending]);
+        setHasMore(true);
+      } else {
+        sent.push(...fresh);
+        sent.sort((a, b) => a.message_id - b.message_id);
+        setMessages([...sent, ...pending]);
+      }
+      UpdateLastReadMessage(
+        selectedServer.server_id,
+        page[page.length - 1].message_id,
+      );
+    };
+    resync();
+  }, [epoch, setMessages, UpdateLastReadMessage]);
 
   const loadOlder = useCallback(async () => {
     if (loadingOlder.current || !hasMore) return 0;

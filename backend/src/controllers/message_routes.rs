@@ -1,8 +1,6 @@
 use crate::middleware::protect_route::JwtGuard;
-use crate::models::{
-    MessageWithServer, SentMessage, ServerSessionIdMap, SessionIdWebsocketMap, WebSocketEvent,
-};
-use crate::utils::broadcast_ws_message::broadcast_to_server;
+use crate::models::{MessageWithServer, SentMessage, WebSocketEvent};
+use crate::utils::hub::Hub;
 use crate::{
     database,
     models::{self, ErrorResponse},
@@ -14,6 +12,7 @@ use rocket::http::Status;
 use rocket::serde::json::Json;
 
 use rocket_db_pools::Connection;
+use std::sync::Arc;
 use utils::user_membership::{ByChannel, UserMembershipChecker};
 use validator::Validate;
 
@@ -47,8 +46,7 @@ pub async fn send_message(
     guard: JwtGuard,
     message_json: Json<models::SendMessageInput>,
     mut db: Connection<database::HarmonyDb>,
-    websocket_map_state: &rocket::State<SessionIdWebsocketMap>,
-    server_map_state: &rocket::State<ServerSessionIdMap>,
+    hub: &rocket::State<Arc<Hub>>,
 ) -> Result<(Status, Json<models::Message>), (Status, Json<ErrorResponse>)> {
     message_json
         .validate()
@@ -78,13 +76,7 @@ pub async fn send_message(
     })?;
 
     // broadcast message to everyone in the server
-    broadcast_to_server(
-        &event_json,
-        server_id,
-        websocket_map_state.inner().clone(),
-        ServerSessionIdMap(server_map_state.0.clone()),
-    )
-    .await;
+    hub.send_to_server(server_id, &event_json);
 
     Ok((Status::Created, Json(sent.message)))
 }

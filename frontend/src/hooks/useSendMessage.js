@@ -8,13 +8,15 @@ import { useAuthContext } from "../context/AuthContext";
 export const upsertMessage = (message, nonce) => {
   const { messages, setMessages, selectedChannel } = useServerStore.getState();
   if (message.channel_id !== selectedChannel?.channel_id) return;
-  if (messages.some((m) => m.message_id === message.message_id)) return;
   if (nonce && messages.some((m) => m.nonce === nonce)) {
-    // keep the nonce so the React key (and the DOM node) stays the same
+    // keep the nonce so the React key (and the DOM node) stays the same;
+    // a reconnect resync may already have added the same message without it
     setMessages(
-      messages.map((m) => (m.nonce === nonce ? { ...message, nonce } : m)),
+      messages
+        .filter((m) => m.nonce === nonce || m.message_id !== message.message_id)
+        .map((m) => (m.nonce === nonce ? { ...message, nonce } : m)),
     );
-  } else {
+  } else if (!messages.some((m) => m.message_id === message.message_id)) {
     setMessages([...messages, message]);
   }
 };

@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { useAuthContext } from "../context/AuthContext";
+import { useWebsocketContext } from "../context/WebsocketContext";
 
 // usually only for server type server, cause the other server types need serverids and userslist
 const useGetServers = (serverType) => {
   const [loading, setLoading] = useState(false);
   const [servers, setServers] = useState([]);
   const { removeLocalStorageAuthUser } = useAuthContext();
+  // refetch unread counts after a reconnect
+  const { epoch } = useWebsocketContext();
 
   useEffect(() => {
     const getServers = async () => {
@@ -30,7 +33,7 @@ const useGetServers = (serverType) => {
     };
 
     getServers();
-  }, [serverType, removeLocalStorageAuthUser]);
+  }, [serverType, removeLocalStorageAuthUser, epoch]);
 
   return { loading, servers };
 };
