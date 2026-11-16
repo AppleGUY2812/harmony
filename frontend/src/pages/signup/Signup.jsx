@@ -3,6 +3,7 @@ import Field from "../../components/SignupField/Field";
 import GuestButton from "../../components/GuestButton/GuestButton";
 import { useCallback, useState } from "react";
 import useSignup from "../../hooks/useSignup";
+import useLogin from "../../hooks/useLogin";
 
 const Signup = () => {
   const [inputs, setInputs] = useState({
@@ -13,6 +14,7 @@ const Signup = () => {
   });
 
   const { loading, signup } = useSignup();
+  const { guestLoading, guestLogin } = useLogin();
 
   const handleOnChange = useCallback(
     (e) => {
@@ -63,12 +65,16 @@ const Signup = () => {
           />
 
           <button
-            disabled={loading}
+            disabled={loading || guestLoading}
             className="mt-12 h-10 w-full rounded-md bg-primary font-semibold text-white hover:brightness-95 active:brightness-90"
           >
             {loading ? <span className="loading loading-spinner" /> : "Signup"}
           </button>
-          <GuestButton />
+          <GuestButton
+            loading={guestLoading}
+            disabled={loading}
+            onClick={guestLogin}
+          />
           <Link
             to={"/login"}
             className="mt-2 text-sm text-cyan-500 hover:cursor-pointer hover:underline"

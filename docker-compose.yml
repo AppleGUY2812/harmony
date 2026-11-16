@@ -24,7 +24,8 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "5500:5500"
+      # localhost only: direct requests would skip nginx and could forge X-Real-IP
+      - "127.0.0.1:5500:5500"
       - "50000:50000/udp"
     volumes:
       - uploads:/uploads

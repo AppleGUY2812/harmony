@@ -3,12 +3,21 @@
 	default_sni {$DEMO_HOST}
 	# :80 below is the plain-http listener for the tunnel, not a redirect
 	auto_https disable_redirects
+	# only the tunnel reaches :80 (not published); trust its Cf-Connecting-IP, which
+	# Cloudflare's edge sets itself, so {client_ip} is the visitor, not cloudflared
+	servers :80 {
+		trusted_proxies static private_ranges
+		client_ip_headers Cf-Connecting-IP
+	}
 }
 
 (app) {
 	@backend path /api/* /ws/* /images/*
 	handle @backend {
-		reverse_proxy backend:5500
+		reverse_proxy backend:5500 {
+			# Rocket's client_ip() reads X-Real-IP; overwrite any client-sent value
+			header_up X-Real-IP {client_ip}
+		}
 	}
 	handle {
 		root * /srv

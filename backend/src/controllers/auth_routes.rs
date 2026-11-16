@@ -174,8 +174,9 @@ impl GuestLimiter {
 }
 
 // IpAddr comes from Request::client_ip(), which trusts Rocket's default
-// ip_header (X-Real-IP); nginx.conf overwrites it with $remote_addr.
-#[post("/guest")]
+// ip_header (X-Real-IP); nginx.conf and demo/Caddyfile overwrite it with the
+// real client address. format = "json" keeps cross-site HTML forms out.
+#[post("/guest", format = "json")]
 pub async fn guest<'a>(
     ip: IpAddr,
     limiter: &State<GuestLimiter>,

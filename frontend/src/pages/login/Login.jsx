@@ -10,7 +10,7 @@ const Login = () => {
     password: "",
   });
 
-  const { loading, login } = useLogin();
+  const { loading, login, guestLoading, guestLogin } = useLogin();
   const handleSubmit = async (e) => {
     e.preventDefault();
     await login(inputs);
@@ -46,12 +46,16 @@ const Login = () => {
           />
 
           <button
-            disabled={loading}
+            disabled={loading || guestLoading}
             className="mt-12 h-10 w-full rounded-md bg-primary font-semibold text-white hover:brightness-95 active:brightness-90"
           >
             {loading ? <span className="loading loading-spinner" /> : "Login"}
           </button>
-          <GuestButton />
+          <GuestButton
+            loading={guestLoading}
+            disabled={loading}
+            onClick={guestLogin}
+          />
           <Link
             to={"/signup"}
             className="mt-2 text-sm text-cyan-500 hover:cursor-pointer hover:underline"
